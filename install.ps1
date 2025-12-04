@@ -12,7 +12,22 @@ if (-not $ChannelUrl) {
     Write-Host "🔄 TDL - Telegram to Google Drive Backup" -ForegroundColor Cyan
     Write-Host "========================================" -ForegroundColor Cyan
     Write-Host ""
-    $ChannelUrl = Read-Host "Enter Telegram channel URL (e.g., https://t.me/yourchannel)"
+    Write-Host "📌 Examples:" -ForegroundColor Yellow
+    Write-Host "  Public channel:  https://t.me/channelname" -ForegroundColor Gray
+    Write-Host "  Private channel: https://t.me/c/1234567890/1-last" -ForegroundColor Gray
+    Write-Host "  Single message:  https://t.me/c/1234567890/123" -ForegroundColor Gray
+    Write-Host ""
+    
+    do {
+        $ChannelUrl = Read-Host "Enter Telegram channel URL"
+        
+        # Validate URL format
+        if ($ChannelUrl -notmatch '^https?://t\.me/') {
+            Write-Host "❌ Invalid URL format! Must start with https://t.me/" -ForegroundColor Red
+            Write-Host "   Example: https://t.me/c/2674423259/1-last" -ForegroundColor Yellow
+            $ChannelUrl = $null
+        }
+    } while (-not $ChannelUrl)
 }
 
 # Create download directory
