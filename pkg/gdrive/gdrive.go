@@ -124,7 +124,7 @@ func UploadFile(srv *drive.Service, name string, content io.Reader) (*drive.File
 	if err != nil {
 		// Check for common Google Drive API errors and provide helpful messages
 		errMsg := err.Error()
-		
+
 		if containsAny(errMsg, "403", "User rate limit exceeded", "userRateLimitExceeded") {
 			fmt.Printf("\n⚠️  Google Drive Rate Limit Hit!\n")
 			fmt.Printf("   You've exceeded 12,000 requests per minute.\n")
@@ -132,7 +132,7 @@ func UploadFile(srv *drive.Service, name string, content io.Reader) (*drive.File
 			fmt.Printf("   → Add delays between uploads (sleep 5-10 seconds)\n\n")
 			return nil, fmt.Errorf("rate limit exceeded (403): wait 1-2 minutes before retrying")
 		}
-		
+
 		if containsAny(errMsg, "429", "Too many requests", "rateLimitExceeded") {
 			fmt.Printf("\n⚠️  Google Drive API Rate Limit!\n")
 			fmt.Printf("   Too many requests in a short time.\n")
@@ -140,7 +140,7 @@ func UploadFile(srv *drive.Service, name string, content io.Reader) (*drive.File
 			fmt.Printf("   → Reduce upload speed\n\n")
 			return nil, fmt.Errorf("too many requests (429): retry after 60 seconds")
 		}
-		
+
 		if containsAny(errMsg, "quota", "quotaExceeded", "Daily Limit Exceeded", "dailyLimitExceeded") {
 			fmt.Printf("\n🚫 Google Drive Daily Quota Exceeded!\n")
 			fmt.Printf("   You've uploaded 750GB in the last 24 hours.\n")
@@ -149,7 +149,7 @@ func UploadFile(srv *drive.Service, name string, content io.Reader) (*drive.File
 			fmt.Printf("   → Your account is SAFE (no suspension)\n\n")
 			return nil, fmt.Errorf("daily upload quota exceeded (750GB): wait 24 hours")
 		}
-		
+
 		if containsAny(errMsg, "storageQuotaExceeded", "storage quota", "insufficient storage") {
 			fmt.Printf("\n💾 Google Drive Storage Full!\n")
 			fmt.Printf("   Your Google Drive storage is full.\n")
@@ -157,7 +157,7 @@ func UploadFile(srv *drive.Service, name string, content io.Reader) (*drive.File
 			fmt.Printf("   → Upgrade storage plan if needed\n\n")
 			return nil, fmt.Errorf("storage quota exceeded: delete files or upgrade storage")
 		}
-		
+
 		if containsAny(errMsg, "invalid_grant", "Token has been expired or revoked") {
 			fmt.Printf("\n🔑 Google Drive Authentication Expired!\n")
 			fmt.Printf("   Your OAuth token is invalid or expired.\n")
@@ -165,7 +165,7 @@ func UploadFile(srv *drive.Service, name string, content io.Reader) (*drive.File
 			fmt.Printf("   → Run the upload command again to re-authenticate\n\n")
 			return nil, fmt.Errorf("authentication expired: delete token file and re-authenticate")
 		}
-		
+
 		if containsAny(errMsg, "connection", "network", "timeout", "i/o timeout") {
 			fmt.Printf("\n🌐 Network Connection Error!\n")
 			fmt.Printf("   Failed to connect to Google Drive API.\n")
@@ -173,7 +173,7 @@ func UploadFile(srv *drive.Service, name string, content io.Reader) (*drive.File
 			fmt.Printf("   → Retry the upload\n\n")
 			return nil, fmt.Errorf("network error: check internet connection and retry")
 		}
-		
+
 		// Generic error with helpful context
 		fmt.Printf("\n❌ Google Drive Upload Failed!\n")
 		fmt.Printf("   File: %s\n", name)
@@ -182,7 +182,7 @@ func UploadFile(srv *drive.Service, name string, content io.Reader) (*drive.File
 		fmt.Printf("   → Check internet connection\n")
 		fmt.Printf("   → Verify API is enabled: https://console.cloud.google.com/apis/library/drive.googleapis.com\n")
 		fmt.Printf("   → Re-authenticate if needed (delete ~/.tdl/gdrive_token.json)\n\n")
-		
+
 		return nil, fmt.Errorf("could not create file: %v", err)
 	}
 	return f, nil
