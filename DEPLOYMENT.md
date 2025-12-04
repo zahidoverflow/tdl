@@ -45,10 +45,10 @@ Docker images are built for:
 
 ### Secrets Required
 
-For deployment to work, ensure these secrets are set in your GitHub repository:
+**Optional (for Docker Hub):**
+- **`DOCKERHUB_TOKEN`**: Docker Hub access token (only if you want to push to Docker Hub)
 
-- **`DOCKERHUB_TOKEN`**: Docker Hub access token
-- **`RELEASE_TOKEN`**: GitHub Personal Access Token with repo permissions
+**Note**: GitHub Container Registry (GHCR) works automatically with the built-in `GITHUB_TOKEN` - no additional secrets needed!
 
 ## Local Development
 
