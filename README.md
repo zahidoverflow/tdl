@@ -4,7 +4,7 @@
 
 > 📥 Telegram Downloader, but more than a downloader
 
-English | <a href="README_zh.md">简体中文</a>
+English | <a href="docs/README_zh.md">简体中文</a>
 
 <p>
 <img src="https://img.shields.io/github/go-mod/go-version/iyear/tdl?style=flat-square" alt="">
@@ -190,12 +190,10 @@ This tool handles sensitive data (Telegram sessions, OAuth tokens). Follow these
 
 3. **Use Disk Encryption:** BitLocker (Windows), FileVault (macOS), or LUKS (Linux)
 
-4. **Run Security Hardening:**
-   ```bash
-   ./scripts/security-harden.sh
-   ```
-
-**📖 Full Security Audit:** See [SECURITY_AUDIT.md](SECURITY_AUDIT.md) for detailed analysis and recommendations.
+**📖 Documentation:**
+- **[Setup & Deployment](docs/SETUP.md)** - Docker deployment, CI/CD configuration
+- **[Security Guide](docs/SECURITY.md)** - Comprehensive security audit and best practices
+- **[Google Drive Limits](docs/GDRIVE_LIMITS.md)** - Mass upload safety, quotas, and account protection
 
 ## Documentation
 
