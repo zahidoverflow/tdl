@@ -13,33 +13,44 @@ Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
 if (-not $ChannelUrl) {
-    Write-Host "📌 Enter Channel Username or ID:" -ForegroundColor Yellow
-    Write-Host "  Public channel:  channelname (without @)" -ForegroundColor Gray
-    Write-Host "  Private channel: 1234567890 (just the number, script adds -100 prefix)" -ForegroundColor Gray
-    Write-Host "  Or find ID using: tdl chat ls" -ForegroundColor Gray
+    Write-Host "📌 Let's find your channel first!" -ForegroundColor Yellow
+    Write-Host "  Running 'tdl chat ls' to show your accessible chats..." -ForegroundColor Gray
+    Write-Host ""
+    
+    # List all chats to help user find correct ID
+    Write-Host "📋 Your accessible chats:" -ForegroundColor Cyan
+    & "$DownloadDir\tdl.exe" chat ls 2>&1
+    
+    Write-Host ""
+    Write-Host "📝 Enter Channel Info:" -ForegroundColor Yellow
+    Write-Host "  Option 1: Username (e.g., ANON_CHANNEL)" -ForegroundColor Gray
+    Write-Host "  Option 2: Full ID from list above (e.g., -1001234567890)" -ForegroundColor Gray
+    Write-Host "  Option 3: Just the number (e.g., 1234567890)" -ForegroundColor Gray
     Write-Host ""
     
     do {
         $ChannelUrl = Read-Host "Enter channel username or ID"
         
-        # Validate: must be either alphanumeric username or number ID
-        if ($ChannelUrl -notmatch '^-?\d+$' -and $ChannelUrl -notmatch '^[a-zA-Z0-9_]+$') {
-            Write-Host "❌ Invalid format!" -ForegroundColor Red
-            Write-Host "   Username: channelname (no @ or https)" -ForegroundColor Yellow
-            Write-Host "   ID: 1234567890 (just numbers)" -ForegroundColor Yellow
+        if ([string]::IsNullOrWhiteSpace($ChannelUrl)) {
+            Write-Host "❌ Please enter something!" -ForegroundColor Red
             $ChannelUrl = $null
         }
     } while (-not $ChannelUrl)
     
-    # Convert to proper Telegram chat ID format
-    if ($ChannelUrl -match '^\d+$') {
-        # Positive number - add -100 prefix for private channel
-        $ChannelUrl = "-100$ChannelUrl"
+    # Smart ID conversion
+    $ChannelUrl = $ChannelUrl.Trim()
+    
+    if ($ChannelUrl -match '^-100\d+$') {
+        # Already correct format
+        Write-Host "✓ Using full chat ID: $ChannelUrl" -ForegroundColor Green
+    } elseif ($ChannelUrl -match '^-?\d+$') {
+        # Numeric ID - convert to proper format
+        $numId = $ChannelUrl.Replace('-', '')
+        $ChannelUrl = "-100$numId"
         Write-Host "✓ Converted to chat ID: $ChannelUrl" -ForegroundColor Green
-    } elseif ($ChannelUrl -match '^-\d+$' -and $ChannelUrl -notmatch '^-100') {
-        # Negative number without -100 prefix - add it
-        $ChannelUrl = "-100" + $ChannelUrl.Substring(1)
-        Write-Host "✓ Converted to chat ID: $ChannelUrl" -ForegroundColor Green
+    } else {
+        # Username - use as-is
+        Write-Host "✓ Using username: $ChannelUrl" -ForegroundColor Green
     }
 }
 
@@ -132,31 +143,51 @@ function Get-DirSizeGB {
 # Start backup
 Write-Host ""
 Write-Host "🚀 Starting Telegram → Google Drive Backup" -ForegroundColor Cyan
-Write-Host "Channel: $ChannelUrl" -ForegroundColor White
+Write-Host "Target: $ChannelUrl" -ForegroundColor White
 Write-Host "Download Dir: $DownloadDir" -ForegroundColor White
 Write-Host "Max Disk: ${MaxDiskGB}GB" -ForegroundColor White
-Write-Host "Method: Export chat → Download files → Upload to GDrive" -ForegroundColor White
+Write-Host "Process: Find chat → Export messages → Download media → Upload to GDrive → Auto-delete" -ForegroundColor White
 Write-Host ""
 
-# Start download in background job using chat export + download
+# Start download in background job using chat export + download  
 Write-Host "📥 Starting channel download..." -ForegroundColor Yellow
 $downloadJob = Start-Job -ScriptBlock {
     param($exe, $chat, $dir)
     $exe = $exe.Replace('\\', '\\\\')
     $dir = $dir.Replace('\\', '\\\\')
     
-    # Step 1: Export all messages from chat (using default time export)
+    # Step 1: Test chat access first
+    Write-Output "Step 1: Testing chat access..."
+    $testResult = & $exe chat ls -f "ID.String() == '$chat' || VisibleName contains '$chat'" 2>&1
+    
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrEmpty($testResult)) {
+        Write-Output "❌ Chat not found or no access: $chat"
+        Write-Output "Available chats:"
+        & $exe chat ls 2>&1
+        return
+    }
+    
+    Write-Output "✅ Chat found: $chat"
+    
+    # Step 2: Export all messages from chat  
     $exportFile = "$dir\export.json"
-    Write-Output "Step 1: Exporting all chat messages..."
+    Write-Output "Step 2: Exporting all chat messages..."
     & $exe chat export -c $chat -o $exportFile -l 4 2>&1
     
     if ($LASTEXITCODE -eq 0 -and (Test-Path $exportFile)) {
-        # Step 2: Download files from export
-        Write-Output "Step 2: Downloading files from export..."
+        # Step 3: Check if export has any messages
+        $exportContent = Get-Content $exportFile -Raw 2>$null
+        if ([string]::IsNullOrWhiteSpace($exportContent) -or $exportContent -eq "[]") {
+            Write-Output "❌ No messages found in chat or no media files"
+            return
+        }
+        
+        # Step 4: Download files from export
+        Write-Output "Step 3: Downloading files from export..."
         & $exe dl -f $exportFile -d $dir --continue -l 4 2>&1
     } else {
-        Write-Output "Export failed - check if channel ID is correct"
-        Write-Output "Last exit code: $LASTEXITCODE"
+        Write-Output "❌ Export failed - check if chat has media files"
+        Write-Output "Exit code: $LASTEXITCODE"
     }
 } -ArgumentList "$DownloadDir\tdl.exe", $ChannelUrl, $DownloadDir
 
