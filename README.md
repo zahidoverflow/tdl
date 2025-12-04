@@ -64,27 +64,46 @@ docker build -t tdl .
 
 Upload files to Google Drive after uploading to Telegram.
 
-#### Setup
+#### Setup (5 minutes)
 
-1. **Enable Google Drive API:**
-   - Visit [Google Cloud Console](https://console.cloud.google.com/)
-   - Create a new project or select existing one
-   - Navigate to "APIs & Services" > "Library"
-   - Search for "Google Drive API" and click "Enable"
+1. **Create Google Cloud Project & Enable Drive API:**
+   - Visit [Google Cloud Console - New Project](https://console.cloud.google.com/projectcreate)
+   - Enter project name and click "Create"
+   - Go to [Enable Google Drive API](https://console.cloud.google.com/apis/library/drive.googleapis.com)
+   - Click "Enable" button
 
-2. **Create OAuth2 Credentials:**
-   - Go to "APIs & Services" > "Credentials"
-   - Click "Create Credentials" > "OAuth client ID"
-   - Select "Desktop app" as application type
-   - Download the JSON credentials file
+2. **Configure OAuth Consent Screen:**
+   - Go to [OAuth Consent Screen](https://console.cloud.google.com/apis/credentials/consent)
+   - Select "External" user type → Click "Create"
+   - Fill in:
+     - App name: `tdl` (or any name)
+     - User support email: your email
+     - Developer contact: your email
+   - Click "Save and Continue" → Skip scopes → Click "Save and Continue"
+   - **Add Test Users:** Click "ADD USERS" → Enter your Google email → Click "Save"
+   - Click "Save and Continue" → "Back to Dashboard"
 
-3. **Configure tdl:**
-   - Rename downloaded file to `gdrive_credentials.json`
-   - Place it in `~/.tdl/` directory
+3. **Create OAuth2 Credentials:**
+   - Go to [Credentials Page](https://console.cloud.google.com/apis/credentials)
+   - Click "Create Credentials" → "OAuth client ID"
+   - Application type: **"Desktop app"**
+   - Name: `tdl-client` (or any name)
+   - Click "Create" → Click "Download JSON"
 
-4. **Add Test User (if app is in Testing mode):**
-   - Go to "OAuth consent screen" > "Test users"
-   - Click "ADD USERS" and add your Google email
+4. **Configure tdl:**
+   ```bash
+   # Create tdl config directory
+   mkdir -p ~/.tdl
+   
+   # Move downloaded file and rename it
+   mv ~/Downloads/client_secret_*.json ~/.tdl/gdrive_credentials.json
+   ```
+
+**Quick Links:**
+- [Create New Project](https://console.cloud.google.com/projectcreate)
+- [Enable Drive API](https://console.cloud.google.com/apis/library/drive.googleapis.com)
+- [OAuth Consent Screen](https://console.cloud.google.com/apis/credentials/consent)
+- [Create Credentials](https://console.cloud.google.com/apis/credentials)
 
 #### Usage
 

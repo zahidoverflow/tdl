@@ -188,7 +188,7 @@ func (u *Uploader) removeFile(elem Elem) error {
 	if filePath == "" {
 		return nil
 	}
-	
+
 	if err := os.Remove(filePath); err != nil {
 		return errors.Wrap(err, "remove file")
 	}
