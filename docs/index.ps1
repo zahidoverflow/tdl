@@ -59,28 +59,44 @@ function Get-DirSizeGB {
 # Helper function to upload and delete files
 function Upload-AndClean {
     $files = Get-ChildItem $DownloadDir -File -ErrorAction SilentlyContinue
-    $uploaded = 0
+    if ($files.Count -eq 0) { return 0 }
     
+    $totalSize = ($files | Measure-Object -Property Length -Sum).Sum
+    $totalGB = [math]::Round($totalSize / 1GB, 2)
+    
+    Write-Host "  📦 Batching $($files.Count) files (${totalGB}GB)..." -ForegroundColor Yellow
+    
+    # Upload entire directory in one batch (much faster!)
+    Write-Host "  📤 Uploading batch to Google Drive..." -ForegroundColor Cyan
+    $output = & tdl.exe up --gdrive --rm -p $DownloadDir 2>&1
+    
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "  ✅ Batch uploaded & deleted ($($files.Count) files)" -ForegroundColor Green
+        return $files.Count
+    }
+    
+    Write-Host "  ⚠️ Batch failed, trying individual files..." -ForegroundColor Yellow
+    
+    # Fallback: Individual file upload
+    $uploaded = 0
     foreach ($file in $files) {
         # Skip files smaller than 1MB (likely still downloading)
         if ($file.Length -lt 1MB) { continue }
         
         $sizeMB = [math]::Round($file.Length / 1MB, 1)
-        Write-Host "  📤 $($file.Name) (${sizeMB}MB)" -ForegroundColor Cyan
+        Write-Host "    📤 $($file.Name) (${sizeMB}MB)" -ForegroundColor Cyan
         
-        # Upload to Google Drive with auto-delete
         $output = & tdl.exe up --gdrive --rm -p $file.FullName 2>&1
         
         if ($LASTEXITCODE -eq 0) {
             $uploaded++
-            Write-Host "     ✅ Uploaded & deleted" -ForegroundColor Green
+            Write-Host "       ✅ Done" -ForegroundColor Green
         } else {
-            Write-Host "     ❌ Failed: $output" -ForegroundColor Red
-            # Delete failed upload file to free space
+            Write-Host "       ❌ Failed" -ForegroundColor Red
             Remove-Item $file.FullName -Force -ErrorAction SilentlyContinue
         }
         
-        Start-Sleep -Seconds 2  # Prevent rate limiting
+        Start-Sleep -Seconds 1
     }
     
     return $uploaded

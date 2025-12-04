@@ -75,13 +75,17 @@ while ($true) {
     
     Write-Host "📤 Uploading $([math]::Round($afterSize, 2))GB to Google Drive..."
     
-    # Upload all files to Google Drive with auto-delete
-    Get-ChildItem $DOWNLOAD_DIR -File | ForEach-Object {
-        $file = $_.FullName
-        Write-Host "  Uploading: $($_.Name)"
+    # Upload entire directory in one batch (much faster for many files)
+    Write-Host "  Uploading all files in batch..."
+    tdl.exe up --gdrive --rm -p $DOWNLOAD_DIR
+    
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "  ⚠️ Batch upload failed, trying individual files..."
         
-        # Upload to Google Drive and delete local file
-        tdl.exe up --gdrive --rm -p $file
+        # Fallback: Upload files individually
+        Get-ChildItem $DOWNLOAD_DIR -File | ForEach-Object {
+            Write-Host "  Uploading: $($_.Name)"
+            tdl.exe up --gdrive --rm -p $_.FullName
         
         if ($LASTEXITCODE -eq 0) {
             Write-Host "    ✅ Uploaded & deleted: $($_.Name)"
