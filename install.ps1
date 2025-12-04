@@ -164,16 +164,42 @@ $downloadJob = Start-Job -ScriptBlock {
     
     # Step 1: Test chat access first
     Write-Output "Step 1: Testing chat access..."
-    $testResult = & $exe chat ls -f "ID.String() == '$chat' || VisibleName contains '$chat'" 2>&1
     
-    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrEmpty($testResult)) {
-        Write-Output "❌ Chat not found or no access: $chat"
-        Write-Output "Available chats:"
-        & $exe chat ls 2>&1
+    # First get list of accessible chats
+    $chatList = & $exe chat ls 2>&1
+    
+    # Check if target chat is in the list
+    $chatFound = $false
+    foreach ($line in $chatList) {
+        if ($line -match $chat -or $line -match [regex]::Escape($chat)) {
+            $chatFound = $true
+            break
+        }
+    }
+    
+    if (-not $chatFound) {
+        Write-Output "❌ Chat not accessible: $chat"
+        Write-Output ""
+        Write-Output "✅ Your accessible chats with media:"
+        Write-Output "ID`t`tType`t`tName`t`t`tUsername"
+        Write-Output "─" * 80
+        
+        # Show only channels and groups (likely to have media)
+        foreach ($line in $chatList) {
+            if ($line -match "(channel|group)" -and $line -notmatch "private") {
+                Write-Output $line
+            }
+        }
+        
+        Write-Output ""
+        Write-Output "💡 To use this script:"
+        Write-Output "   1. Copy any channel/group ID from above (e.g., 3316433241)"
+        Write-Output "   2. Or use username (e.g., shadown9xp)"
+        Write-Output "   3. Re-run script with correct ID/username"
         return
     }
     
-    Write-Output "✅ Chat found: $chat"
+    Write-Output "✅ Chat accessible: $chat"
     
     # Step 2: Export all messages from chat  
     $exportFile = "$dir\export.json"
