@@ -15,26 +15,31 @@ Write-Host ""
 if (-not $ChannelUrl) {
     Write-Host "📌 Enter Channel Username or ID:" -ForegroundColor Yellow
     Write-Host "  Public channel:  channelname (without @)" -ForegroundColor Gray
-    Write-Host "  Private channel: -1234567890 (with negative sign)" -ForegroundColor Gray
+    Write-Host "  Private channel: 1234567890 (just the number, script adds -100 prefix)" -ForegroundColor Gray
     Write-Host "  Or find ID using: tdl chat ls" -ForegroundColor Gray
     Write-Host ""
     
     do {
         $ChannelUrl = Read-Host "Enter channel username or ID"
         
-        # Validate: must be either alphanumeric username or negative number ID
+        # Validate: must be either alphanumeric username or number ID
         if ($ChannelUrl -notmatch '^-?\d+$' -and $ChannelUrl -notmatch '^[a-zA-Z0-9_]+$') {
             Write-Host "❌ Invalid format!" -ForegroundColor Red
             Write-Host "   Username: channelname (no @ or https)" -ForegroundColor Yellow
-            Write-Host "   ID: -100XXXXXXXXXX or -XXXXXXXXXX" -ForegroundColor Yellow
+            Write-Host "   ID: 1234567890 (just numbers)" -ForegroundColor Yellow
             $ChannelUrl = $null
         }
     } while (-not $ChannelUrl)
     
-    # Convert to proper format for chat export
+    # Convert to proper Telegram chat ID format
     if ($ChannelUrl -match '^\d+$') {
-        # If user entered positive ID, make it negative
-        $ChannelUrl = "-$ChannelUrl"
+        # Positive number - add -100 prefix for private channel
+        $ChannelUrl = "-100$ChannelUrl"
+        Write-Host "✓ Converted to chat ID: $ChannelUrl" -ForegroundColor Green
+    } elseif ($ChannelUrl -match '^-\d+$' -and $ChannelUrl -notmatch '^-100') {
+        # Negative number without -100 prefix - add it
+        $ChannelUrl = "-100" + $ChannelUrl.Substring(1)
+        Write-Host "✓ Converted to chat ID: $ChannelUrl" -ForegroundColor Green
     }
 }
 
