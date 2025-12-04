@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TDL Smart Backup - Telegram to Google Drive</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #0d1117;
+            color: #c9d1d9;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        h1 {
+            color: #58a6ff;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #8b949e;
+            font-size: 18px;
+        }
+        .command-box {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 20px;
+            margin: 20px 0;
+            font-family: 'Courier New', monospace;
+        }
+        .command {
+            color: #7ee787;
+            font-size: 16px;
+            word-break: break-all;
+        }
+        .copy-btn {
+            background: #238636;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+        .copy-btn:hover {
+            background: #2ea043;
+        }
+        .feature {
+            background: #161b22;
+            border-left: 3px solid #58a6ff;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .feature-title {
+            color: #58a6ff;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .warning {
+            background: #2d1c00;
+            border-left: 3px solid #f85149;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        code {
+            background: #161b22;
+            padding: 2px 6px;
+            border-radius: 3px;
+            color: #7ee787;
+        }
+        a {
+            color: #58a6ff;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📥 TDL Smart Backup</h1>
+        <p class="subtitle">Download Telegram channels directly to Google Drive</p>
+    </div>
+
+    <div class="feature">
+        <div class="feature-title">✨ Features</div>
+        <ul>
+            <li>✅ Download entire Telegram channels (100-300GB+)</li>
+            <li>✅ Auto-upload to Google Drive</li>
+            <li>✅ Auto-delete after upload (saves disk space)</li>
+            <li>✅ Maintains 50GB disk usage limit</li>
+            <li>✅ Resume capability with <code>--continue</code></li>
+            <li>✅ Perfect for GitHub Actions runners</li>
+        </ul>
+    </div>
+
+    <div class="command-box">
+        <div style="margin-bottom: 10px; color: #8b949e;">One-liner execution (Windows PowerShell):</div>
+        <div class="command" id="command">irm https://zahidoverflow.github.io/tdl/install.ps1 | iex</div>
+        <button class="copy-btn" onclick="copyCommand()">📋 Copy Command</button>
+    </div>
+
+    <div class="warning">
+        <strong>⚠️ Prerequisites:</strong><br>
+        1. Windows with PowerShell<br>
+        2. Telegram account logged in (script will prompt for <code>tdl login</code>)<br>
+        3. Google Drive OAuth credentials in <code>%USERPROFILE%\.tdl\gdrive_credentials.json</code><br>
+        4. See <a href="https://github.com/zahidoverflow/tdl#new-features" target="_blank">setup guide</a> for Google Drive configuration
+    </div>
+
+    <h2>📖 How It Works</h2>
+    <ol>
+        <li>Script auto-installs tdl.exe if not found</li>
+        <li>Prompts for Telegram channel URL</li>
+        <li>Downloads files in background</li>
+        <li>Monitors disk usage (limit: 45GB)</li>
+        <li>Uploads completed files to Google Drive</li>
+        <li>Deletes local files after successful upload</li>
+        <li>Repeats until entire channel is backed up</li>
+    </ol>
+
+    <h2>🚀 Usage in GitHub Actions</h2>
+    <pre style="background: #161b22; padding: 15px; border-radius: 6px; overflow-x: auto;">
+<code>- name: Run TDL Backup
+  shell: pwsh
+  run: |
+    irm https://zahidoverflow.github.io/tdl/install.ps1 | iex
+  env:
+    CHANNEL_URL: https://t.me/yourchannel</code>
+    </pre>
+
+    <h2>💡 Manual Execution</h2>
+    <pre style="background: #161b22; padding: 15px; border-radius: 6px; overflow-x: auto;">
+<code># Download and run directly
+irm https://zahidoverflow.github.io/tdl/install.ps1 | iex
+
+# Or save and run with parameters
+irm https://zahidoverflow.github.io/tdl/install.ps1 -OutFile backup.ps1
+.\backup.ps1 -ChannelUrl "https://t.me/channel" -MaxSizeGB 45</code>
+    </pre>
+
+    <h2>📊 Expected Performance</h2>
+    <div class="feature">
+        For a 300GB channel on GitHub Actions (6hr limit):
+        <ul>
+            <li>Day 1: ~45GB backed up</li>
+            <li>Day 2: ~45GB backed up (resumes automatically)</li>
+            <li>Day 3-7: Continue until complete</li>
+            <li>Total: ~7 days for 300GB channel</li>
+        </ul>
+    </div>
+
+    <h2>🔗 Links</h2>
+    <ul>
+        <li><a href="https://github.com/zahidoverflow/tdl">GitHub Repository</a></li>
+        <li><a href="https://github.com/zahidoverflow/tdl/blob/master/docs/GDRIVE_LIMITS.md">Google Drive Limits Guide</a></li>
+        <li><a href="https://github.com/zahidoverflow/tdl/blob/master/docs/SECURITY.md">Security Guide</a></li>
+        <li><a href="install.ps1" download>Download install.ps1</a></li>
+    </ul>
+
+    <div style="text-align: center; margin-top: 50px; color: #8b949e; font-size: 14px;">
+        <p>Made with ❤️ by <a href="https://github.com/zahidoverflow">zahidoverflow</a></p>
+        <p>Based on <a href="https://github.com/iyear/tdl">iyear/tdl</a></p>
+    </div>
+
+    <script>
+        function copyCommand() {
+            const command = document.getElementById('command').textContent;
+            navigator.clipboard.writeText(command).then(() => {
+                const btn = document.querySelector('.copy-btn');
+                btn.textContent = '✅ Copied!';
+                setTimeout(() => {
+                    btn.textContent = '📋 Copy Command';
+                }, 2000);
+            });
+        }
+    </script>
+</body>
+</html>
