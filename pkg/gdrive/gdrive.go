@@ -85,7 +85,7 @@ func tokenFromFile(file string) (*oauth2.Token, error) {
 // saveToken saves a token to a file path.
 func saveToken(path string, token *oauth2.Token) {
 	fmt.Printf("Saving credential file to: %s\n", path)
-	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
+	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		fmt.Printf("Unable to cache oauth token: %v", err)
 		return
