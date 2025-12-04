@@ -19,6 +19,7 @@ type iterElem struct {
 	thread  int
 
 	asPhoto bool
+	gdrive  bool
 	remove  bool
 }
 
@@ -47,6 +48,21 @@ func (e *iterElem) Thread() int {
 
 func (e *iterElem) AsPhoto() bool {
 	return e.asPhoto
+}
+
+func (e *iterElem) Gdrive() bool {
+	return e.gdrive
+}
+
+func (e *iterElem) Remove() bool {
+	return e.remove
+}
+
+func (e *iterElem) FilePath() string {
+	if e.file != nil {
+		return e.file.File.Name()
+	}
+	return ""
 }
 
 type uploaderFile struct {

@@ -39,6 +39,7 @@ type Options struct {
 	Includes []string
 	Excludes []string
 	Remove   bool
+	Gdrive   bool
 	Photo    bool
 	Caption  string
 }
@@ -95,7 +96,7 @@ func Run(ctx context.Context, c *telegram.Client, kvd storage.Storage, opts Opti
 	options := uploader.Options{
 		Client:   pool.Default(ctx),
 		Threads:  viper.GetInt(consts.FlagThreads),
-		Iter:     newIter(files, to, caption, opts.Chat, opts.Thread, opts.Photo, opts.Remove, viper.GetDuration(consts.FlagDelay), manager),
+		Iter:     newIter(files, to, caption, opts.Chat, opts.Thread, opts.Photo, opts.Gdrive, opts.Remove, viper.GetDuration(consts.FlagDelay), manager),
 		Progress: newProgress(upProgress),
 	}
 

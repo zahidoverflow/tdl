@@ -3,6 +3,7 @@ package uploader
 import (
 	"context"
 	"io"
+	"os"
 	"time"
 
 	"github.com/gabriel-vasile/mimetype"
@@ -17,6 +18,8 @@ import (
 
 	"github.com/iyear/tdl/core/util/fsutil"
 	"github.com/iyear/tdl/core/util/mediautil"
+	"github.com/iyear/tdl/pkg/consts"
+	"github.com/iyear/tdl/pkg/gdrive"
 )
 
 // MaxPartSize refer to https://core.telegram.org/api/files#uploading-files
@@ -151,5 +154,43 @@ func (u *Uploader) upload(ctx context.Context, elem Elem) error {
 		return errors.Wrap(err, "send message")
 	}
 
+	if elem.Gdrive() {
+		if err := u.uploadToGdrive(ctx, elem); err != nil {
+			return errors.Wrap(err, "upload to gdrive")
+		}
+	}
+
+	if elem.Remove() {
+		if err := u.removeFile(elem); err != nil {
+			return errors.Wrap(err, "remove file")
+		}
+	}
+
+	return nil
+}
+
+func (u *Uploader) uploadToGdrive(ctx context.Context, elem Elem) error {
+	srv, err := gdrive.GetClient(ctx, consts.DataDir)
+	if err != nil {
+		return err
+	}
+
+	if _, err := elem.File().Seek(0, io.SeekStart); err != nil {
+		return errors.Wrap(err, "seek file")
+	}
+
+	_, err = gdrive.UploadFile(srv, elem.File().Name(), elem.File())
+	return err
+}
+
+func (u *Uploader) removeFile(elem Elem) error {
+	filePath := elem.FilePath()
+	if filePath == "" {
+		return nil
+	}
+	
+	if err := os.Remove(filePath); err != nil {
+		return errors.Wrap(err, "remove file")
+	}
 	return nil
 }

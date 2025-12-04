@@ -5,5 +5,9 @@ log
 downloads
 *.exe
 tdl
+tdl-test
 .hugo_build.lock
 .DS_Store
+test_upload.txt
+test_files/
+gdrive_credentials.json
