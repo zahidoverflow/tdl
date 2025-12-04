@@ -13,23 +13,24 @@ Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
 if (-not $ChannelUrl) {
-    Write-Host "📌 Let's find your channel first!" -ForegroundColor Yellow
-    Write-Host "  Running 'tdl chat ls' to show your accessible chats..." -ForegroundColor Gray
-    Write-Host ""
-    
-    # List all chats to help user find correct ID
-    Write-Host "📋 Your accessible chats:" -ForegroundColor Cyan
-    & "$DownloadDir\tdl.exe" chat ls 2>&1
-    
-    Write-Host ""
-    Write-Host "📝 Enter Channel Info:" -ForegroundColor Yellow
-    Write-Host "  Option 1: Username (e.g., ANON_CHANNEL)" -ForegroundColor Gray
-    Write-Host "  Option 2: Full ID from list above (e.g., -1001234567890)" -ForegroundColor Gray
-    Write-Host "  Option 3: Just the number (e.g., 1234567890)" -ForegroundColor Gray
+    Write-Host "📌 Enter Channel Info:" -ForegroundColor Yellow
+    Write-Host "  Option 1: Message link (e.g., https://t.me/c/2674423259/8465)" -ForegroundColor Gray
+    Write-Host "  Option 2: Username (e.g., ANON_CHANNEL)" -ForegroundColor Gray
+    Write-Host "  Option 3: Let script find it (will show your chats)" -ForegroundColor Gray
     Write-Host ""
     
     do {
-        $ChannelUrl = Read-Host "Enter channel username or ID"
+        $ChannelUrl = Read-Host "Enter channel link, username, or press Enter to list chats"
+        
+        if ([string]::IsNullOrWhiteSpace($ChannelUrl)) {
+            # User pressed Enter - show chat list
+            Write-Host ""
+            Write-Host "📋 Your accessible chats:" -ForegroundColor Cyan
+            & "$DownloadDir\tdl.exe" chat ls 2>&1 | Out-Host
+            
+            Write-Host ""
+            $ChannelUrl = Read-Host "Now enter channel username or ID from the list above"
+        }
         
         if ([string]::IsNullOrWhiteSpace($ChannelUrl)) {
             Write-Host "❌ Please enter something!" -ForegroundColor Red
@@ -37,12 +38,17 @@ if (-not $ChannelUrl) {
         }
     } while (-not $ChannelUrl)
     
-    # Smart ID conversion
+    # Smart conversion
     $ChannelUrl = $ChannelUrl.Trim()
     
-    if ($ChannelUrl -match '^-100\d+$') {
+    if ($ChannelUrl -match '^https://t\.me/c/(\d+)') {
+        # Extract channel ID from message link
+        $channelId = $matches[1]
+        $ChannelUrl = "-100$channelId"
+        Write-Host "✓ Extracted channel ID: $ChannelUrl" -ForegroundColor Green
+    } elseif ($ChannelUrl -match '^-100\d+$') {
         # Already correct format
-        Write-Host "✓ Using full chat ID: $ChannelUrl" -ForegroundColor Green
+        Write-Host "✓ Using chat ID: $ChannelUrl" -ForegroundColor Green
     } elseif ($ChannelUrl -match '^-?\d+$') {
         # Numeric ID - convert to proper format
         $numId = $ChannelUrl.Replace('-', '')
