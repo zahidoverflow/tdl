@@ -24,8 +24,13 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 
 FROM alpine:latest
 
-RUN apk add --no-cache ca-certificates
+RUN apk add --no-cache ca-certificates && \
+    addgroup -S tdl && \
+    adduser -S tdl -G tdl
 
 COPY --from=builder /tdl /usr/bin/tdl
+
+# Run as non-root user for security
+USER tdl
 
 ENTRYPOINT ["tdl"]

@@ -174,6 +174,29 @@ tdl upload -p /file.txt --gdrive --rm
 - **Google Drive token:** `~/.tdl/gdrive_token.json` (auto-generated)
 - **Logs:** `~/.tdl/log/`
 
+## Security
+
+**🔒 For Personal Use:**
+
+This tool handles sensitive data (Telegram sessions, OAuth tokens). Follow these security practices:
+
+1. **Secure Your Credentials:**
+   ```bash
+   chmod 700 ~/.tdl
+   chmod 600 ~/.tdl/gdrive_credentials.json
+   ```
+
+2. **Enable Telegram 2FA:** Settings → Privacy and Security → Two-Step Verification
+
+3. **Use Disk Encryption:** BitLocker (Windows), FileVault (macOS), or LUKS (Linux)
+
+4. **Run Security Hardening:**
+   ```bash
+   ./scripts/security-harden.sh
+   ```
+
+**📖 Full Security Audit:** See [SECURITY_AUDIT.md](SECURITY_AUDIT.md) for detailed analysis and recommendations.
+
 ## Documentation
 
 For detailed documentation, please refer to [docs.iyear.me/tdl](https://docs.iyear.me/tdl/).
