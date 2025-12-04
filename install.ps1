@@ -130,17 +130,28 @@ Write-Host "🚀 Starting Telegram → Google Drive Backup" -ForegroundColor Cya
 Write-Host "Channel: $ChannelUrl" -ForegroundColor White
 Write-Host "Download Dir: $DownloadDir" -ForegroundColor White
 Write-Host "Max Disk: ${MaxDiskGB}GB" -ForegroundColor White
-Write-Host "Method: chat export (downloads all media)" -ForegroundColor White
+Write-Host "Method: Export chat → Download files → Upload to GDrive" -ForegroundColor White
 Write-Host ""
 
-# Start download in background job using chat export
+# Start download in background job using chat export + download
 Write-Host "📥 Starting channel download..." -ForegroundColor Yellow
 $downloadJob = Start-Job -ScriptBlock {
     param($exe, $chat, $dir)
     $exe = $exe.Replace('\\', '\\\\')
     $dir = $dir.Replace('\\', '\\\\')
-    # Use chat export to download all media from channel
-    & $exe chat export -c $chat -o "$dir\export.json" --media -l 4 2>&1
+    
+    # Step 1: Export chat to JSON (media messages only)
+    $exportFile = "$dir\export.json"
+    Write-Output "Step 1: Exporting chat metadata..."
+    & $exe chat export -c $chat -o $exportFile -T last -l 4 2>&1
+    
+    if ($LASTEXITCODE -eq 0 -and (Test-Path $exportFile)) {
+        # Step 2: Download files from export
+        Write-Output "Step 2: Downloading files from export..."
+        & $exe dl -f $exportFile -d $dir --continue -l 4 2>&1
+    } else {
+        Write-Output "Export failed, trying direct download..."
+    }
 } -ArgumentList "$DownloadDir\tdl.exe", $ChannelUrl, $DownloadDir
 
 Write-Host "✅ Download started in background (Job ID: $($downloadJob.Id))" -ForegroundColor Green
@@ -163,10 +174,11 @@ while ($true) {
     # Get current disk usage
     $currentSize = Get-DirSizeGB -Path $DownloadDir
     
-    # Get files ready for upload (exclude tdl.exe and temp files)
+    # Get files ready for upload (exclude tdl.exe, temp files, and export.json)
     $files = Get-ChildItem $DownloadDir -File -ErrorAction SilentlyContinue | 
              Where-Object { 
                  $_.Name -ne "tdl.exe" -and 
+                 $_.Name -ne "export.json" -and
                  $_.Extension -ne ".tmp" -and 
                  $_.Extension -ne ".part" -and
                  -not $_.Name.EndsWith('.downloading') -and
