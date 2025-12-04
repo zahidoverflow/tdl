@@ -13,22 +13,29 @@ Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
 if (-not $ChannelUrl) {
-    Write-Host "📌 URL Examples:" -ForegroundColor Yellow
-    Write-Host "  Public channel:  https://t.me/channelname" -ForegroundColor Gray
-    Write-Host "  Private channel: https://t.me/c/1234567890/1-last" -ForegroundColor Gray
-    Write-Host "  Single message:  https://t.me/c/1234567890/123" -ForegroundColor Gray
+    Write-Host "📌 Enter Channel Username or ID:" -ForegroundColor Yellow
+    Write-Host "  Public channel:  channelname (without @)" -ForegroundColor Gray
+    Write-Host "  Private channel: -1234567890 (with negative sign)" -ForegroundColor Gray
+    Write-Host "  Or find ID using: tdl chat ls" -ForegroundColor Gray
     Write-Host ""
     
     do {
-        $ChannelUrl = Read-Host "Enter Telegram channel URL"
+        $ChannelUrl = Read-Host "Enter channel username or ID"
         
-        # Validate URL format
-        if ($ChannelUrl -notmatch '^https?://t\.me/') {
-            Write-Host "❌ Invalid URL format! Must start with https://t.me/" -ForegroundColor Red
-            Write-Host "   Example: https://t.me/c/2674423259/1-last" -ForegroundColor Yellow
+        # Validate: must be either alphanumeric username or negative number ID
+        if ($ChannelUrl -notmatch '^-?\d+$' -and $ChannelUrl -notmatch '^[a-zA-Z0-9_]+$') {
+            Write-Host "❌ Invalid format!" -ForegroundColor Red
+            Write-Host "   Username: channelname (no @ or https)" -ForegroundColor Yellow
+            Write-Host "   ID: -100XXXXXXXXXX or -XXXXXXXXXX" -ForegroundColor Yellow
             $ChannelUrl = $null
         }
     } while (-not $ChannelUrl)
+    
+    # Convert to proper format for chat export
+    if ($ChannelUrl -match '^\d+$') {
+        # If user entered positive ID, make it negative
+        $ChannelUrl = "-$ChannelUrl"
+    }
 }
 
 if (-not $DownloadDir) {
@@ -123,15 +130,17 @@ Write-Host "🚀 Starting Telegram → Google Drive Backup" -ForegroundColor Cya
 Write-Host "Channel: $ChannelUrl" -ForegroundColor White
 Write-Host "Download Dir: $DownloadDir" -ForegroundColor White
 Write-Host "Max Disk: ${MaxDiskGB}GB" -ForegroundColor White
+Write-Host "Method: chat export (downloads all media)" -ForegroundColor White
 Write-Host ""
 
-# Start download in background job
+# Start download in background job using chat export
 Write-Host "📥 Starting channel download..." -ForegroundColor Yellow
 $downloadJob = Start-Job -ScriptBlock {
-    param($exe, $url, $dir)
-    $exe = $exe.Replace('\', '\\')
-    $dir = $dir.Replace('\', '\\')
-    & $exe dl -u $url -d $dir --continue -l 4 2>&1
+    param($exe, $chat, $dir)
+    $exe = $exe.Replace('\\', '\\\\')
+    $dir = $dir.Replace('\\', '\\\\')
+    # Use chat export to download all media from channel
+    & $exe chat export -c $chat -o "$dir\export.json" --media -l 4 2>&1
 } -ArgumentList "$DownloadDir\tdl.exe", $ChannelUrl, $DownloadDir
 
 Write-Host "✅ Download started in background (Job ID: $($downloadJob.Id))" -ForegroundColor Green
