@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -24,12 +25,26 @@ func GetClient(ctx context.Context, configDir string) (*drive.Service, error) {
 	credsPath := filepath.Join(configDir, credentialsFile)
 	b, err := os.ReadFile(credsPath)
 	if err != nil {
+		fmt.Printf("\n❌ Google Drive Credentials Not Found!\n")
+		fmt.Printf("   Missing: %s\n\n", credsPath)
+		fmt.Printf("   Setup steps:\n")
+		fmt.Printf("   1. Create Google Cloud project: https://console.cloud.google.com/projectcreate\n")
+		fmt.Printf("   2. Enable Drive API: https://console.cloud.google.com/apis/library/drive.googleapis.com\n")
+		fmt.Printf("   3. Create OAuth credentials (Desktop app)\n")
+		fmt.Printf("   4. Download JSON and save to: %s\n\n", credsPath)
 		return nil, fmt.Errorf("unable to read client secret file: %v", err)
 	}
 
 	// If modifying these scopes, delete your previously saved token.json.
 	config, err := google.ConfigFromJSON(b, drive.DriveFileScope)
 	if err != nil {
+		fmt.Printf("\n❌ Invalid Google Drive Credentials!\n")
+		fmt.Printf("   File: %s\n", credsPath)
+		fmt.Printf("   Error: %v\n\n", err)
+		fmt.Printf("   Solutions:\n")
+		fmt.Printf("   → Re-download OAuth credentials from Google Cloud Console\n")
+		fmt.Printf("   → Ensure you selected 'Desktop app' (not Web app)\n")
+		fmt.Printf("   → Check JSON file is not corrupted\n\n")
 		return nil, fmt.Errorf("unable to parse client secret file to config: %v", err)
 	}
 
@@ -46,6 +61,12 @@ func GetClient(ctx context.Context, configDir string) (*drive.Service, error) {
 	client := config.Client(ctx, tok)
 	srv, err := drive.NewService(ctx, option.WithHTTPClient(client))
 	if err != nil {
+		fmt.Printf("\n❌ Failed to Connect to Google Drive!\n")
+		fmt.Printf("   Error: %v\n\n", err)
+		fmt.Printf("   Troubleshooting:\n")
+		fmt.Printf("   → Check internet connection\n")
+		fmt.Printf("   → Verify Drive API is enabled\n")
+		fmt.Printf("   → Delete token and re-authenticate: rm %s\n\n", tokenPath)
 		return nil, fmt.Errorf("unable to retrieve Drive client: %v", err)
 	}
 
@@ -101,7 +122,79 @@ func UploadFile(srv *drive.Service, name string, content io.Reader) (*drive.File
 	}
 	f, err := srv.Files.Create(file).Media(content).Do()
 	if err != nil {
+		// Check for common Google Drive API errors and provide helpful messages
+		errMsg := err.Error()
+		
+		if containsAny(errMsg, "403", "User rate limit exceeded", "userRateLimitExceeded") {
+			fmt.Printf("\n⚠️  Google Drive Rate Limit Hit!\n")
+			fmt.Printf("   You've exceeded 12,000 requests per minute.\n")
+			fmt.Printf("   → Wait 1-2 minutes and try again\n")
+			fmt.Printf("   → Add delays between uploads (sleep 5-10 seconds)\n\n")
+			return nil, fmt.Errorf("rate limit exceeded (403): wait 1-2 minutes before retrying")
+		}
+		
+		if containsAny(errMsg, "429", "Too many requests", "rateLimitExceeded") {
+			fmt.Printf("\n⚠️  Google Drive API Rate Limit!\n")
+			fmt.Printf("   Too many requests in a short time.\n")
+			fmt.Printf("   → Wait 60 seconds and retry\n")
+			fmt.Printf("   → Reduce upload speed\n\n")
+			return nil, fmt.Errorf("too many requests (429): retry after 60 seconds")
+		}
+		
+		if containsAny(errMsg, "quota", "quotaExceeded", "Daily Limit Exceeded", "dailyLimitExceeded") {
+			fmt.Printf("\n🚫 Google Drive Daily Quota Exceeded!\n")
+			fmt.Printf("   You've uploaded 750GB in the last 24 hours.\n")
+			fmt.Printf("   → Wait 24 hours before uploading more\n")
+			fmt.Printf("   → Quota resets automatically\n")
+			fmt.Printf("   → Your account is SAFE (no suspension)\n\n")
+			return nil, fmt.Errorf("daily upload quota exceeded (750GB): wait 24 hours")
+		}
+		
+		if containsAny(errMsg, "storageQuotaExceeded", "storage quota", "insufficient storage") {
+			fmt.Printf("\n💾 Google Drive Storage Full!\n")
+			fmt.Printf("   Your Google Drive storage is full.\n")
+			fmt.Printf("   → Delete old files to free up space\n")
+			fmt.Printf("   → Upgrade storage plan if needed\n\n")
+			return nil, fmt.Errorf("storage quota exceeded: delete files or upgrade storage")
+		}
+		
+		if containsAny(errMsg, "invalid_grant", "Token has been expired or revoked") {
+			fmt.Printf("\n🔑 Google Drive Authentication Expired!\n")
+			fmt.Printf("   Your OAuth token is invalid or expired.\n")
+			fmt.Printf("   → Delete ~/.tdl/gdrive_token.json\n")
+			fmt.Printf("   → Run the upload command again to re-authenticate\n\n")
+			return nil, fmt.Errorf("authentication expired: delete token file and re-authenticate")
+		}
+		
+		if containsAny(errMsg, "connection", "network", "timeout", "i/o timeout") {
+			fmt.Printf("\n🌐 Network Connection Error!\n")
+			fmt.Printf("   Failed to connect to Google Drive API.\n")
+			fmt.Printf("   → Check your internet connection\n")
+			fmt.Printf("   → Retry the upload\n\n")
+			return nil, fmt.Errorf("network error: check internet connection and retry")
+		}
+		
+		// Generic error with helpful context
+		fmt.Printf("\n❌ Google Drive Upload Failed!\n")
+		fmt.Printf("   File: %s\n", name)
+		fmt.Printf("   Error: %v\n\n", err)
+		fmt.Printf("   Common solutions:\n")
+		fmt.Printf("   → Check internet connection\n")
+		fmt.Printf("   → Verify API is enabled: https://console.cloud.google.com/apis/library/drive.googleapis.com\n")
+		fmt.Printf("   → Re-authenticate if needed (delete ~/.tdl/gdrive_token.json)\n\n")
+		
 		return nil, fmt.Errorf("could not create file: %v", err)
 	}
 	return f, nil
+}
+
+// containsAny checks if the string contains any of the substrings (case-insensitive)
+func containsAny(s string, substrs ...string) bool {
+	lower := strings.ToLower(s)
+	for _, substr := range substrs {
+		if strings.Contains(lower, strings.ToLower(substr)) {
+			return true
+		}
+	}
+	return false
 }
