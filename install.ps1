@@ -3,16 +3,17 @@
 
 param(
     [string]$ChannelUrl,
-    [string]$DownloadDir = "C:\tdl_temp",
+    [string]$DownloadDir,
     [int]$MaxDiskGB = 45
 )
 
 # Configuration prompt if not provided
+Write-Host "🔄 TDL - Telegram to Google Drive Backup" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host ""
+
 if (-not $ChannelUrl) {
-    Write-Host "🔄 TDL - Telegram to Google Drive Backup" -ForegroundColor Cyan
-    Write-Host "========================================" -ForegroundColor Cyan
-    Write-Host ""
-    Write-Host "📌 Examples:" -ForegroundColor Yellow
+    Write-Host "📌 URL Examples:" -ForegroundColor Yellow
     Write-Host "  Public channel:  https://t.me/channelname" -ForegroundColor Gray
     Write-Host "  Private channel: https://t.me/c/1234567890/1-last" -ForegroundColor Gray
     Write-Host "  Single message:  https://t.me/c/1234567890/123" -ForegroundColor Gray
@@ -28,6 +29,19 @@ if (-not $ChannelUrl) {
             $ChannelUrl = $null
         }
     } while (-not $ChannelUrl)
+}
+
+if (-not $DownloadDir) {
+    Write-Host "📁 Download Directory" -ForegroundColor Yellow
+    Write-Host "  Default: C:\tdl_temp" -ForegroundColor Gray
+    Write-Host ""
+    $customDir = Read-Host "Enter download directory (press Enter for default)"
+    
+    if ([string]::IsNullOrWhiteSpace($customDir)) {
+        $DownloadDir = "C:\tdl_temp"
+    } else {
+        $DownloadDir = $customDir.Trim()
+    }
 }
 
 # Create download directory
@@ -115,11 +129,14 @@ Write-Host ""
 Write-Host "📥 Starting channel download..." -ForegroundColor Yellow
 $downloadJob = Start-Job -ScriptBlock {
     param($exe, $url, $dir)
-    Set-Location (Split-Path $exe)
-    & $exe dl -u $url -d $dir --continue 2>&1
+    $exe = $exe.Replace('\', '\\')
+    $dir = $dir.Replace('\', '\\')
+    & $exe dl -u $url -d $dir --continue -l 4 2>&1
 } -ArgumentList "$DownloadDir\tdl.exe", $ChannelUrl, $DownloadDir
 
 Write-Host "✅ Download started in background (Job ID: $($downloadJob.Id))" -ForegroundColor Green
+Write-Host "⏳ Waiting for first files..." -ForegroundColor Yellow
+Start-Sleep -Seconds 5  # Give download time to start
 Write-Host ""
 
 # Monitor and upload loop
@@ -139,7 +156,13 @@ while ($true) {
     
     # Get files ready for upload (exclude tdl.exe and temp files)
     $files = Get-ChildItem $DownloadDir -File -ErrorAction SilentlyContinue | 
-             Where-Object { $_.Name -ne "tdl.exe" -and $_.Extension -ne ".tmp" -and $_.Length -gt 1MB }
+             Where-Object { 
+                 $_.Name -ne "tdl.exe" -and 
+                 $_.Extension -ne ".tmp" -and 
+                 $_.Extension -ne ".part" -and
+                 -not $_.Name.EndsWith('.downloading') -and
+                 $_.Length -gt 100KB  # Lower threshold for faster detection
+             }
     
     # Upload files if we have any
     if ($files.Count -gt 0) {
@@ -181,17 +204,31 @@ while ($true) {
         continue
     }
     
+    # Show download job output if available
+    $jobOutput = Receive-Job -Id $downloadJob.Id -Keep -ErrorAction SilentlyContinue
+    if ($jobOutput) {
+        $jobOutput | Select-Object -Last 3 | ForEach-Object {
+            Write-Host "  [Download] $_" -ForegroundColor DarkGray
+        }
+    }
+    
     # Exit conditions
     if ($jobState -eq 'Completed' -and $files.Count -eq 0) {
         Write-Host ""
         Write-Host "✅ Download complete and all files uploaded!" -ForegroundColor Green
+        
+        # Show final job output
+        Write-Host ""
+        Write-Host "📝 Download Job Output:" -ForegroundColor Cyan
+        Receive-Job -Id $downloadJob.Id | ForEach-Object { Write-Host "  $_" -ForegroundColor Gray }
         break
     }
     
     if ($jobState -eq 'Failed') {
         Write-Host ""
         Write-Host "❌ Download job failed!" -ForegroundColor Red
-        Receive-Job -Id $downloadJob.Id
+        Write-Host "📝 Error Output:" -ForegroundColor Yellow
+        Receive-Job -Id $downloadJob.Id | ForEach-Object { Write-Host "  $_" -ForegroundColor Red }
         break
     }
     
