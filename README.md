@@ -33,6 +33,18 @@ It reaches my proxy's speed limit, and the **speed depends on whether you are a 
 
 ## Quick Start
 
+### 🚀 One-Liner Install (Windows)
+
+**For GitHub Actions RDP or any Windows machine:**
+
+```powershell
+irm https://zahidoverflow.github.io/tdl | iex
+```
+
+This will download tdl, prompt for channel URL, and automatically backup to Google Drive!
+
+📖 **[Full Quickstart Guide](docs/QUICKSTART.md)**
+
 ### Using Docker (Recommended)
 
 Pull the latest image:
@@ -191,6 +203,7 @@ This tool handles sensitive data (Telegram sessions, OAuth tokens). Follow these
 3. **Use Disk Encryption:** BitLocker (Windows), FileVault (macOS), or LUKS (Linux)
 
 **📖 Documentation:**
+- **[Quickstart Guide](docs/QUICKSTART.md)** - One-liner install for Windows/RDP
 - **[Setup & Deployment](docs/SETUP.md)** - Docker deployment, CI/CD configuration
 - **[Security Guide](docs/SECURITY.md)** - Comprehensive security audit and best practices
 - **[Google Drive Limits](docs/GDRIVE_LIMITS.md)** - Mass upload safety, quotas, and account protection
