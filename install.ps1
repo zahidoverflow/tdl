@@ -140,17 +140,18 @@ $downloadJob = Start-Job -ScriptBlock {
     $exe = $exe.Replace('\\', '\\\\')
     $dir = $dir.Replace('\\', '\\\\')
     
-    # Step 1: Export chat to JSON (last 10000 messages - should cover most channels)
+    # Step 1: Export all messages from chat (using default time export)
     $exportFile = "$dir\export.json"
-    Write-Output "Step 1: Exporting chat metadata (last 10000 messages)..."
-    & $exe chat export -c $chat -o $exportFile -T last -i 10000 -l 4 2>&1
+    Write-Output "Step 1: Exporting all chat messages..."
+    & $exe chat export -c $chat -o $exportFile -l 4 2>&1
     
     if ($LASTEXITCODE -eq 0 -and (Test-Path $exportFile)) {
         # Step 2: Download files from export
         Write-Output "Step 2: Downloading files from export..."
         & $exe dl -f $exportFile -d $dir --continue -l 4 2>&1
     } else {
-        Write-Output "Export failed or no messages found"
+        Write-Output "Export failed - check if channel ID is correct"
+        Write-Output "Last exit code: $LASTEXITCODE"
     }
 } -ArgumentList "$DownloadDir\tdl.exe", $ChannelUrl, $DownloadDir
 
