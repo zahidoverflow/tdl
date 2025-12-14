@@ -19,25 +19,14 @@
 
 ## 🔴 CRITICAL ISSUES (Fix Immediately)
 
-### 1. TLS Certificate Verification Disabled for Proxies
+### 1. TLS Certificate Verification for Proxies (Configurable)
 
-**File:** `core/util/netutil/netutil.go:13`
-```go
-InsecureSkipVerify: true,
-```
+**File:** `core/util/netutil/netutil.go`  
+**Default:** TLS verification enabled  
+**Override:** set `TDL_INSECURE_SKIP_VERIFY=true` to disable verification for problematic/self-signed proxy certificates.
 
-**Risk:** Man-in-the-middle (MITM) attacks when using HTTPS proxies  
-**Impact:** Attackers on your network could intercept credentials and data  
-**Severity:** HIGH
-
-**Fix Required:**
-```go
-connectproxy.Register(&connectproxy.Config{
-    InsecureSkipVerify: false,  // Enable certificate verification
-})
-```
-
-**Recommendation:** Only disable this if you're using self-signed proxy certificates. For personal use, set to `false`.
+**Risk (when disabled):** Man-in-the-middle (MITM) attacks when using HTTPS proxies  
+**Recommendation:** Keep verification enabled unless you understand and accept the risk.
 
 ---
 
@@ -99,20 +88,9 @@ func validatePath(path string) error {
 
 ### 5. Docker Container Runs as Root
 
-**File:** `Dockerfile:28`
-
-**Risk:** Container escape could compromise host system  
-**Current:** Runs as root user  
-
-**Recommended Fix:**
-```dockerfile
-FROM alpine:latest
-RUN apk add --no-cache ca-certificates && \
-    addgroup -S tdl && adduser -S tdl -G tdl
-COPY --from=builder /tdl /usr/bin/tdl
-USER tdl  # Add this line
-ENTRYPOINT ["tdl"]
-```
+**Status:** Fixed  
+**File:** `Dockerfile`  
+**Current:** Container runs as non-root user (`USER tdl`).
 
 ---
 

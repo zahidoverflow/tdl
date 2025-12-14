@@ -1,5 +1,5 @@
 # TDL Telegram to Google Drive Backup Script
-# One-liner install: irm https://zahidoverflow.github.io/tdl | iex
+# One-liner: irm https://zahidoverflow.github.io/tdl | iex
 
 param(
     [string]$ChannelUrl,
@@ -7,138 +7,13 @@ param(
     [int]$MaxDiskGB = 45
 )
 
-# Configuration prompt if not provided
-Write-Host "🔄 TDL - Telegram to Google Drive Backup" -ForegroundColor Cyan
-Write-Host "========================================" -ForegroundColor Cyan
-Write-Host ""
+$ErrorActionPreference = "Stop"
 
-if (-not $ChannelUrl) {
-    Write-Host "📌 Enter Channel Info:" -ForegroundColor Yellow
-    Write-Host "  Option 1: Message link (e.g., https://t.me/c/2674423259/8465)" -ForegroundColor Gray
-    Write-Host "  Option 2: Username (e.g., ANON_CHANNEL)" -ForegroundColor Gray
-    Write-Host "  Option 3: Let script find it (will show your chats)" -ForegroundColor Gray
-    Write-Host ""
-    
-    do {
-        $ChannelUrl = Read-Host "Enter channel link, username, or press Enter to list chats"
-        
-        if ([string]::IsNullOrWhiteSpace($ChannelUrl)) {
-            # User pressed Enter - show chat list
-            Write-Host ""
-            Write-Host "📋 Your accessible chats:" -ForegroundColor Cyan
-            & "$DownloadDir\tdl.exe" chat ls 2>&1 | Out-Host
-            
-            Write-Host ""
-            $ChannelUrl = Read-Host "Now enter channel username or ID from the list above"
-        }
-        
-        if ([string]::IsNullOrWhiteSpace($ChannelUrl)) {
-            Write-Host "❌ Please enter something!" -ForegroundColor Red
-            $ChannelUrl = $null
-        }
-    } while (-not $ChannelUrl)
-    
-    # Smart conversion
-    $ChannelUrl = $ChannelUrl.Trim()
-    
-    if ($ChannelUrl -match '^https://t\.me/c/(\d+)') {
-        # Extract channel ID from message link
-        $channelId = $matches[1]
-        $ChannelUrl = "-100$channelId"
-        Write-Host "✓ Extracted channel ID: $ChannelUrl" -ForegroundColor Green
-    } elseif ($ChannelUrl -match '^-100\d+$') {
-        # Already correct format
-        Write-Host "✓ Using chat ID: $ChannelUrl" -ForegroundColor Green
-    } elseif ($ChannelUrl -match '^-?\d+$') {
-        # Numeric ID - convert to proper format
-        $numId = $ChannelUrl.Replace('-', '')
-        $ChannelUrl = "-100$numId"
-        Write-Host "✓ Converted to chat ID: $ChannelUrl" -ForegroundColor Green
-    } else {
-        # Username - use as-is
-        Write-Host "✓ Using username: $ChannelUrl" -ForegroundColor Green
-    }
-}
-
-if (-not $DownloadDir) {
-    Write-Host "📁 Download Directory" -ForegroundColor Yellow
-    Write-Host "  Default: C:\tdl_temp" -ForegroundColor Gray
-    Write-Host ""
-    $customDir = Read-Host "Enter download directory (press Enter for default)"
-    
-    if ([string]::IsNullOrWhiteSpace($customDir)) {
-        $DownloadDir = "C:\tdl_temp"
-    } else {
-        $DownloadDir = $customDir.Trim()
-    }
-}
-
-# Create download directory
-New-Item -ItemType Directory -Force -Path $DownloadDir | Out-Null
-
-# Download tdl.exe
-Write-Host "📥 Downloading tdl.exe..." -ForegroundColor Yellow
-$TdlZip = "$env:TEMP\tdl.zip"
-$TdlDir = "$env:TEMP\tdl"
-
-try {
-    $latest = (Invoke-RestMethod "https://api.github.com/repos/zahidoverflow/tdl/releases/latest").tag_name
-    $url = "https://github.com/zahidoverflow/tdl/releases/download/$latest/tdl_Windows_64bit.zip"
-    
-    Invoke-WebRequest -Uri $url -OutFile $TdlZip -UseBasicParsing
-    Expand-Archive -Path $TdlZip -DestinationPath $TdlDir -Force
-    
-    $tdlExe = Get-ChildItem -Path $TdlDir -Filter "tdl.exe" -Recurse | Select-Object -First 1
-    
-    if (-not $tdlExe) {
-        throw "tdl.exe not found in downloaded archive"
-    }
-    
-    Copy-Item $tdlExe.FullName -Destination "$DownloadDir\tdl.exe" -Force
-    Set-Location $DownloadDir
-    
-    Write-Host "✅ Downloaded tdl.exe" -ForegroundColor Green
-} catch {
-    Write-Host "❌ Failed to download tdl.exe: $_" -ForegroundColor Red
-    exit 1
-}
-
-# Check if already logged in
-$configDir = "$env:USERPROFILE\.tdl"
-if (-not (Test-Path "$configDir\data\data")) {
-    Write-Host ""
-    Write-Host "🔐 First time setup - Login to Telegram" -ForegroundColor Yellow
-    Write-Host "You need to authenticate with Telegram..." -ForegroundColor Yellow
-    & .\tdl.exe login
-    
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "❌ Login failed" -ForegroundColor Red
-        exit 1
-    }
-}
-
-# Check Google Drive credentials
-if (-not (Test-Path "$configDir\gdrive_credentials.json")) {
-    Write-Host ""
-    Write-Host "⚠️ Google Drive credentials not found!" -ForegroundColor Red
-    Write-Host "Please setup Google Drive credentials first:" -ForegroundColor Yellow
-    Write-Host "1. Create credentials: https://console.cloud.google.com/apis/credentials" -ForegroundColor Cyan
-    Write-Host "2. Save JSON to: $configDir\gdrive_credentials.json" -ForegroundColor Cyan
-    Write-Host ""
-    Read-Host "Press Enter when credentials file is ready"
-    
-    if (-not (Test-Path "$configDir\gdrive_credentials.json")) {
-        Write-Host "❌ Credentials still not found. Exiting." -ForegroundColor Red
-        exit 1
-    }
-}
-
-# Main backup function
 function Get-DirSizeGB {
     param([string]$Path)
     if (Test-Path $Path) {
-        $size = (Get-ChildItem $Path -Recurse -File -ErrorAction SilentlyContinue | 
-                 Measure-Object -Property Length -Sum -ErrorAction SilentlyContinue).Sum
+        $size = (Get-ChildItem $Path -Recurse -File -ErrorAction SilentlyContinue |
+                Measure-Object -Property Length -Sum -ErrorAction SilentlyContinue).Sum
         if ($size) {
             return [math]::Round($size / 1GB, 2)
         }
@@ -146,201 +21,250 @@ function Get-DirSizeGB {
     return 0
 }
 
-# Start backup
-Write-Host ""
-Write-Host "🚀 Starting Telegram → Google Drive Backup" -ForegroundColor Cyan
-Write-Host "Target: $ChannelUrl" -ForegroundColor White
-Write-Host "Download Dir: $DownloadDir" -ForegroundColor White
-Write-Host "Max Disk: ${MaxDiskGB}GB" -ForegroundColor White
-Write-Host "Process: Find chat → Export messages → Download media → Upload to GDrive → Auto-delete" -ForegroundColor White
-Write-Host ""
+function Resolve-ChatInput {
+    param([string]$InputValue)
 
-# Start download in background job using chat export + download  
-Write-Host "📥 Starting channel download..." -ForegroundColor Yellow
-$downloadJob = Start-Job -ScriptBlock {
-    param($exe, $chat, $dir)
-    $exe = $exe.Replace('\\', '\\\\')
-    $dir = $dir.Replace('\\', '\\\\')
-    
-    # Step 1: Test chat access first
-    Write-Output "Step 1: Testing chat access..."
-    
-    # First get list of accessible chats
-    $chatList = & $exe chat ls 2>&1
-    
-    # Check if target chat is in the list
-    $chatFound = $false
-    foreach ($line in $chatList) {
-        if ($line -match $chat -or $line -match [regex]::Escape($chat)) {
-            $chatFound = $true
-            break
-        }
+    $s = ([string]$InputValue).Trim()
+    if ([string]::IsNullOrWhiteSpace($s)) { return "" }
+
+    if ($s -match '^https://t\.me/c/(\d+)') {
+        return $matches[1]
     }
-    
-    if (-not $chatFound) {
-        Write-Output "❌ Chat not accessible: $chat"
-        Write-Output ""
-        Write-Output "✅ Your accessible chats with media:"
-        Write-Output "ID`t`tType`t`tName`t`t`tUsername"
-        Write-Output "─" * 80
-        
-        # Show only channels and groups (likely to have media)
-        foreach ($line in $chatList) {
-            if ($line -match "(channel|group)" -and $line -notmatch "private") {
-                Write-Output $line
-            }
-        }
-        
-        Write-Output ""
-        Write-Output "💡 To use this script:"
-        Write-Output "   1. Copy any channel/group ID from above (e.g., 3316433241)"
-        Write-Output "   2. Or use username (e.g., shadown9xp)"
-        Write-Output "   3. Re-run script with correct ID/username"
+    if ($s -match '^-100(\d+)$') {
+        return $matches[1]
+    }
+    if ($s -match '^-(\d+)$') {
+        return $matches[1]
+    }
+
+    return $s
+}
+
+function Ensure-TdlExe {
+    param(
+        [string]$ExePath
+    )
+
+    if (Test-Path $ExePath) {
+        Write-Host "? Using existing tdl.exe: $ExePath" -ForegroundColor Green
         return
     }
-    
-    Write-Output "✅ Chat accessible: $chat"
-    
-    # Step 2: Export all messages from chat  
-    $exportFile = "$dir\export.json"
-    Write-Output "Step 2: Exporting all chat messages..."
-    & $exe chat export -c $chat -o $exportFile -l 4 2>&1
-    
-    if ($LASTEXITCODE -eq 0 -and (Test-Path $exportFile)) {
-        # Step 3: Check if export has any messages
-        $exportContent = Get-Content $exportFile -Raw 2>$null
-        if ([string]::IsNullOrWhiteSpace($exportContent) -or $exportContent -eq "[]") {
-            Write-Output "❌ No messages found in chat or no media files"
-            return
-        }
-        
-        # Step 4: Download files from export
-        Write-Output "Step 3: Downloading files from export..."
-        & $exe dl -f $exportFile -d $dir --continue -l 4 2>&1
-    } else {
-        Write-Output "❌ Export failed - check if chat has media files"
-        Write-Output "Exit code: $LASTEXITCODE"
+
+    $arch = switch ($env:PROCESSOR_ARCHITECTURE) {
+        "AMD64" { "64bit" }
+        "x86" { "32bit" }
+        "ARM64" { "arm64" }
+        default { "64bit" }
     }
-} -ArgumentList "$DownloadDir\tdl.exe", $ChannelUrl, $DownloadDir
 
-Write-Host "✅ Download started in background (Job ID: $($downloadJob.Id))" -ForegroundColor Green
-Write-Host "⏳ Waiting for first files..." -ForegroundColor Yellow
-Start-Sleep -Seconds 5  # Give download time to start
+    Write-Host "?? Downloading tdl.exe ($arch)..." -ForegroundColor Yellow
+
+    $zipPath = Join-Path $env:TEMP "tdl.zip"
+    $extractDir = Join-Path $env:TEMP "tdl_extract"
+
+    try {
+        $latest = (Invoke-RestMethod "https://api.github.com/repos/zahidoverflow/tdl/releases/latest").tag_name
+        $url = "https://github.com/zahidoverflow/tdl/releases/download/$latest/tdl_Windows_$arch.zip"
+
+        Invoke-WebRequest -Uri $url -OutFile $zipPath -UseBasicParsing
+        Expand-Archive -Path $zipPath -DestinationPath $extractDir -Force
+
+        $exe = Get-ChildItem -Path $extractDir -Filter "tdl.exe" -Recurse | Select-Object -First 1
+        if (-not $exe) {
+            throw "tdl.exe not found in downloaded archive"
+        }
+
+        Copy-Item $exe.FullName -Destination $ExePath -Force
+        Write-Host "? Downloaded tdl.exe" -ForegroundColor Green
+    } finally {
+        Remove-Item $zipPath -Force -ErrorAction SilentlyContinue
+        Remove-Item $extractDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+Write-Host "?? TDL - Telegram -> Google Drive Backup" -ForegroundColor Cyan
+Write-Host "======================================" -ForegroundColor Cyan
 Write-Host ""
 
-# Monitor and upload loop
+if (-not $DownloadDir) {
+    Write-Host "?? Download Directory" -ForegroundColor Yellow
+    Write-Host "  Default: C:\tdl_temp" -ForegroundColor Gray
+    Write-Host ""
+    $customDir = Read-Host "Enter download directory (press Enter for default)"
+    if ([string]::IsNullOrWhiteSpace($customDir)) {
+        $DownloadDir = "C:\tdl_temp"
+    } else {
+        $DownloadDir = $customDir.Trim()
+    }
+}
+
+New-Item -ItemType Directory -Force -Path $DownloadDir | Out-Null
+$tdlExePath = Join-Path $DownloadDir "tdl.exe"
+
+Ensure-TdlExe -ExePath $tdlExePath
+Set-Location $DownloadDir
+
+if (-not $ChannelUrl) {
+    Write-Host "?? Enter Channel / Chat:" -ForegroundColor Yellow
+    Write-Host "  Option 1: Message link (e.g., https://t.me/c/2674423259/8465)" -ForegroundColor Gray
+    Write-Host "  Option 2: Username (e.g., ANON_CHANNEL)" -ForegroundColor Gray
+    Write-Host "  Option 3: Press Enter to list chats" -ForegroundColor Gray
+    Write-Host ""
+
+    do {
+        $ChannelUrl = Read-Host "Enter link/username/ID (or press Enter to list chats)"
+        if ([string]::IsNullOrWhiteSpace($ChannelUrl)) {
+            Write-Host ""
+            Write-Host "?? Your accessible chats:" -ForegroundColor Cyan
+            & $tdlExePath chat ls 2>&1 | Out-Host
+            Write-Host ""
+            $ChannelUrl = Read-Host "Now enter a chat username or ID from the list above"
+        }
+    } while ([string]::IsNullOrWhiteSpace($ChannelUrl))
+}
+
+$ChannelUrl = Resolve-ChatInput -InputValue $ChannelUrl
+Write-Host "? Target: $ChannelUrl" -ForegroundColor Green
+
+# Telegram login (first time)
+$configDir = Join-Path $env:USERPROFILE ".tdl"
+if (-not (Test-Path (Join-Path $configDir "data\\data"))) {
+    Write-Host ""
+    Write-Host "?? First time setup - Login to Telegram" -ForegroundColor Yellow
+    & $tdlExePath login
+    if ($LASTEXITCODE -ne 0) { throw "Telegram login failed" }
+}
+
+# Google Drive credentials
+$gdriveCreds = Join-Path $configDir "gdrive_credentials.json"
+if (-not (Test-Path $gdriveCreds)) {
+    Write-Host ""
+    Write-Host "?? Google Drive credentials not found!" -ForegroundColor Red
+    Write-Host "Save OAuth JSON here: $gdriveCreds" -ForegroundColor Yellow
+    Write-Host "Create credentials: https://console.cloud.google.com/apis/credentials" -ForegroundColor Cyan
+    Write-Host ""
+    Read-Host "Press Enter when the credentials file is ready"
+    if (-not (Test-Path $gdriveCreds)) { throw "Google Drive credentials still not found" }
+}
+
+Write-Host ""
+Write-Host "?? Starting backup" -ForegroundColor Cyan
+Write-Host "  DownloadDir: $DownloadDir" -ForegroundColor White
+Write-Host "  MaxDiskGB:   $MaxDiskGB" -ForegroundColor White
+Write-Host ""
+
+$downloadJob = Start-Job -ScriptBlock {
+    param($exe, $chat, $dir)
+
+    $ErrorActionPreference = "Stop"
+
+    $exportFile = Join-Path $dir "export.json"
+
+    Write-Output "Step 1: Exporting messages (for download)..."
+    & $exe chat export -c $chat -o $exportFile 2>&1
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path $exportFile)) {
+        throw "chat export failed (exit=$LASTEXITCODE)"
+    }
+
+    Write-Output "Step 2: Downloading media from export..."
+    & $exe dl -f $exportFile -d $dir --continue -l 4 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        throw "download failed (exit=$LASTEXITCODE)"
+    }
+    Write-Output "Download finished"
+} -ArgumentList $tdlExePath, $ChannelUrl, $DownloadDir
+
+Write-Host "? Download started (Job ID: $($downloadJob.Id))" -ForegroundColor Green
+Write-Host ""
+
 $uploadedCount = 0
-$totalSizeUploaded = 0
-$lastCheck = Get-Date
-
-Write-Host "🔄 Monitoring for completed downloads..." -ForegroundColor Cyan
-Write-Host ""
+$totalSizeUploadedBytes = 0
+$lastStatus = Get-Date
 
 while ($true) {
-    # Check if download job is still running
     $jobState = (Get-Job -Id $downloadJob.Id).State
-    
-    # Get current disk usage
     $currentSize = Get-DirSizeGB -Path $DownloadDir
-    
-    # Get files ready for upload (exclude tdl.exe, temp files, and export.json)
-    $files = Get-ChildItem $DownloadDir -File -ErrorAction SilentlyContinue | 
-             Where-Object { 
-                 $_.Name -ne "tdl.exe" -and 
-                 $_.Name -ne "export.json" -and
-                 $_.Extension -ne ".tmp" -and 
-                 $_.Extension -ne ".part" -and
-                 -not $_.Name.EndsWith('.downloading') -and
-                 $_.Length -gt 100KB  # Lower threshold for faster detection
-             }
-    
-    # Upload files if we have any
+
+    $files = Get-ChildItem $DownloadDir -File -ErrorAction SilentlyContinue |
+        Where-Object {
+            $_.Name -ne "tdl.exe" -and
+            $_.Name -ne "export.json" -and
+            $_.Extension -notin @(".tmp", ".part") -and
+            -not $_.Name.EndsWith(".downloading") -and
+            $_.Length -gt 1MB
+        }
+
     if ($files.Count -gt 0) {
-        Write-Host "📤 Found $($files.Count) file(s) ready for upload" -ForegroundColor Yellow
-        
+        Write-Host "?? Found $($files.Count) file(s) ready for upload" -ForegroundColor Yellow
         foreach ($file in $files) {
             $fileSizeMB = [math]::Round($file.Length / 1MB, 2)
-            Write-Host "  → Uploading: $($file.Name) (${fileSizeMB}MB)" -ForegroundColor White
-            
-            # Upload to Google Drive and delete
-            & .\tdl.exe up --gdrive --rm -p $file.FullName 2>&1 | Out-Null
-            
+            Write-Host "  -> $($file.Name) (${fileSizeMB}MB)" -ForegroundColor White
+
+            & $tdlExePath up --gdrive --rm -p $file.FullName
             if ($LASTEXITCODE -eq 0) {
                 $uploadedCount++
-                $totalSizeUploaded += $file.Length
-                Write-Host "    ✅ Uploaded & deleted" -ForegroundColor Green
+                $totalSizeUploadedBytes += $file.Length
+                Write-Host "     ? Uploaded & deleted" -ForegroundColor Green
             } else {
-                Write-Host "    ⚠️ Upload failed, keeping file" -ForegroundColor Yellow
+                Write-Host "     ?? Upload failed, keeping file" -ForegroundColor Yellow
             }
-            
-            Start-Sleep -Seconds 2  # Prevent rate limiting
+
+            Start-Sleep -Seconds 2
         }
-        
         Write-Host ""
     }
-    
-    # Status update every 30 seconds
+
     $now = Get-Date
-    if (($now - $lastCheck).TotalSeconds -ge 30) {
-        $uploadedGB = [math]::Round($totalSizeUploaded / 1GB, 2)
-        Write-Host "📊 Status: Uploaded $uploadedCount files (${uploadedGB}GB) | Disk: ${currentSize}GB/${MaxDiskGB}GB | Job: $jobState" -ForegroundColor Cyan
-        $lastCheck = $now
+    if (($now - $lastStatus).TotalSeconds -ge 30) {
+        $uploadedGB = [math]::Round($totalSizeUploadedBytes / 1GB, 2)
+        Write-Host "?? Status: Uploaded $uploadedCount files (${uploadedGB}GB) | Disk: ${currentSize}GB/${MaxDiskGB}GB | Job: $jobState" -ForegroundColor Cyan
+        $lastStatus = $now
     }
-    
-    # Check disk limit
-    if ($currentSize -ge $MaxDiskGB) {
-        Write-Host "⚠️ Disk limit reached! Waiting for uploads to free space..." -ForegroundColor Red
-        Start-Sleep -Seconds 10
-        continue
-    }
-    
-    # Show download job output if available
+
     $jobOutput = Receive-Job -Id $downloadJob.Id -Keep -ErrorAction SilentlyContinue
     if ($jobOutput) {
         $jobOutput | Select-Object -Last 3 | ForEach-Object {
             Write-Host "  [Download] $_" -ForegroundColor DarkGray
         }
     }
-    
-    # Exit conditions
-    if ($jobState -eq 'Completed' -and $files.Count -eq 0) {
+
+    if ($currentSize -ge $MaxDiskGB) {
+        Write-Host "?? Disk limit reached (${currentSize}GB >= ${MaxDiskGB}GB). Waiting for uploads to free space..." -ForegroundColor Red
+        Start-Sleep -Seconds 10
+        continue
+    }
+
+    if ($jobState -eq "Completed" -and $files.Count -eq 0) {
         Write-Host ""
-        Write-Host "✅ Download complete and all files uploaded!" -ForegroundColor Green
-        
-        # Show final job output
-        Write-Host ""
-        Write-Host "📝 Download Job Output:" -ForegroundColor Cyan
-        Receive-Job -Id $downloadJob.Id | ForEach-Object { Write-Host "  $_" -ForegroundColor Gray }
+        Write-Host "? Download complete and all files uploaded!" -ForegroundColor Green
         break
     }
-    
-    if ($jobState -eq 'Failed') {
+
+    if ($jobState -eq "Failed") {
         Write-Host ""
-        Write-Host "❌ Download job failed!" -ForegroundColor Red
-        Write-Host "📝 Error Output:" -ForegroundColor Yellow
-        Receive-Job -Id $downloadJob.Id | ForEach-Object { Write-Host "  $_" -ForegroundColor Red }
+        Write-Host "? Download job failed!" -ForegroundColor Red
+        Receive-Job -Id $downloadJob.Id -ErrorAction SilentlyContinue | ForEach-Object {
+            Write-Host "  $_" -ForegroundColor Red
+        }
         break
     }
-    
-    # Wait before next check
+
     Start-Sleep -Seconds 10
 }
 
-# Cleanup
 Write-Host ""
-Write-Host "🧹 Cleaning up..." -ForegroundColor Yellow
+Write-Host "?? Cleaning up..." -ForegroundColor Yellow
 Remove-Job -Id $downloadJob.Id -Force -ErrorAction SilentlyContinue
 
-$finalSize = [math]::Round($totalSizeUploaded / 1GB, 2)
+$finalGB = [math]::Round($totalSizeUploadedBytes / 1GB, 2)
 Write-Host ""
-Write-Host "🎉 Backup Complete!" -ForegroundColor Green
+Write-Host "?? Backup Complete!" -ForegroundColor Green
 Write-Host "Files uploaded: $uploadedCount" -ForegroundColor White
-Write-Host "Total size: ${finalSize}GB" -ForegroundColor White
+Write-Host "Total size: ${finalGB}GB" -ForegroundColor White
 Write-Host ""
 
-# Ask to cleanup download directory
 $cleanup = Read-Host "Delete download directory? (y/N)"
-if ($cleanup -eq 'y' -or $cleanup -eq 'Y') {
+if ($cleanup -eq "y" -or $cleanup -eq "Y") {
     Remove-Item $DownloadDir -Recurse -Force -ErrorAction SilentlyContinue
-    Write-Host "✅ Cleanup complete" -ForegroundColor Green
+    Write-Host "? Cleanup complete" -ForegroundColor Green
 }

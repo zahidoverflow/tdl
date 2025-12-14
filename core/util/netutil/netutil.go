@@ -2,6 +2,8 @@ package netutil
 
 import (
 	"net/url"
+	"os"
+	"strconv"
 
 	"github.com/go-faster/errors"
 	"github.com/iyear/connectproxy"
@@ -9,8 +11,15 @@ import (
 )
 
 func init() {
+	insecureSkipVerify := false
+	if v := os.Getenv("TDL_INSECURE_SKIP_VERIFY"); v != "" {
+		if b, err := strconv.ParseBool(v); err == nil {
+			insecureSkipVerify = b
+		}
+	}
+
 	connectproxy.Register(&connectproxy.Config{
-		InsecureSkipVerify: true,
+		InsecureSkipVerify: insecureSkipVerify,
 	})
 }
 

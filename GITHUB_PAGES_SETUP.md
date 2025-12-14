@@ -21,7 +21,7 @@ To make the one-liner work, you need to enable GitHub Pages:
 
 7. Test the URL: https://zahidoverflow.github.io/tdl
 
-It should redirect to the install.ps1 script.
+It should return a small PowerShell bootstrap script (used by the one-liner).
 
 ## Testing
 
