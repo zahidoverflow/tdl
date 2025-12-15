@@ -132,8 +132,17 @@ $configDir = Join-Path $env:USERPROFILE ".tdl"
 if (-not (Test-Path (Join-Path $configDir "data\\data"))) {
     Write-Host ""
     Write-Host "?? First time setup - Login to Telegram" -ForegroundColor Yellow
-    & $tdlExePath login
-    if ($LASTEXITCODE -ne 0) { throw "Telegram login failed" }
+    while ($true) {
+        & $tdlExePath login
+        if ($LASTEXITCODE -eq 0) {
+            break
+        }
+        Write-Host ""
+        Write-Host "⚠️  Telegram login failed (exit=$LASTEXITCODE)." -ForegroundColor Red
+        Write-Host "   Make sure no other `tdl.exe` processes are running and try again." -ForegroundColor Yellow
+        Write-Host "   You can rerun after closing other downloads or removing locks (e.g. delete ~/.tdl/data/data.lock)." -ForegroundColor Yellow
+        Read-Host "Press Enter to retry login (Ctrl+C to cancel)"
+    }
 }
 
 # Google Drive credentials
