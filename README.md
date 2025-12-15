@@ -2,27 +2,27 @@
 
 <img align="right" src="docs/assets/img/logo.png" height="280" alt="">
 
-> 📥 Telegram Downloader, but more than a downloader
+> Telegram Downloader, but more than a downloader
 
-English | <a href="docs/README_zh.md">简体中文</a>
+English | <a href="docs/README_zh.md">中文</a>
 
 <p>
-<img src="https://img.shields.io/github/go-mod/go-version/iyear/tdl?style=flat-square" alt="">
-<img src="https://img.shields.io/github/license/iyear/tdl?style=flat-square" alt="">
-<img src="https://img.shields.io/github/actions/workflow/status/iyear/tdl/master.yml?branch=master&amp;style=flat-square" alt="">
-<img src="https://img.shields.io/github/v/release/iyear/tdl?color=red&amp;style=flat-square" alt="">
-<img src="https://img.shields.io/github/downloads/iyear/tdl/total?style=flat-square" alt="">
+<img src="https://img.shields.io/github/go-mod/go-version/zahidoverflow/tdl?style=flat-square" alt="">
+<img src="https://img.shields.io/github/license/zahidoverflow/tdl?style=flat-square" alt="">
+<img src="https://img.shields.io/github/actions/workflow/status/zahidoverflow/tdl/master.yml?branch=master&amp;style=flat-square" alt="">
+<img src="https://img.shields.io/github/v/release/zahidoverflow/tdl?color=red&amp;style=flat-square" alt="">
+<img src="https://img.shields.io/github/downloads/zahidoverflow/tdl/total?style=flat-square" alt="">
 </p>
 
-#### Features:
+#### Features
 - Single file start-up
 - Low resource usage
 - Take up all your bandwidth
 - Faster than official clients
 - Download files from (protected) chats
 - Forward messages with automatic fallback and message routing
-- Upload files to Telegram **and Google Drive** 🆕
-- **Auto-delete local files after upload** 🆕
+- Upload files to Telegram **and Google Drive**
+- Auto-delete local files after upload (`--rm`)
 - Export messages/members/subscribers to JSON
 
 ## Preview
@@ -33,17 +33,30 @@ It reaches my proxy's speed limit, and the **speed depends on whether you are a 
 
 ## Quick Start
 
-### 🚀 One-Liner Install (Windows)
+### One-Liner Install (Windows PowerShell)
 
-GitHub Pages now serves a tiny PowerShell bootstrap script at `https://zahidoverflow.github.io/tdl` (see `docs/index.html` for the source; the same script is mirrored at the repository root so the URL works when Pages is configured on `master`/root). Running the command below downloads `install.ps1`, which fetches `tdl.exe`, asks for the chat, and automatically uploads the files to Google Drive:
+Run in PowerShell 5+ (or PowerShell 7+):
 
 ```powershell
 irm https://zahidoverflow.github.io/tdl | iex
 ```
 
-Need to reset the Pages site after a workflow or release change? Follow [GITHUB_PAGES_SETUP.md](GITHUB_PAGES_SETUP.md) to point the source at `master`/root so the bootstrap URL keeps working.
+If you're in Command Prompt (`cmd.exe`):
 
-📖 **[Full Quickstart Guide](docs/QUICKSTART.md)**
+```bat
+powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://zahidoverflow.github.io/tdl | iex"
+```
+
+Notes:
+- `tdl.exe` is downloaded into the current directory (where you run the command).
+- Config + credentials live in `~/.tdl/`:
+  - `~/.tdl/gdrive_credentials.json`
+  - `~/.tdl/gdrive_token.json` (auto-created after first auth)
+- Google Drive uploads are placed in a date folder (e.g. `2025-12-15`) at Drive root.
+
+Need to reset GitHub Pages source? See [GITHUB_PAGES_SETUP.md](GITHUB_PAGES_SETUP.md).
+
+**[Full Quickstart Guide](docs/QUICKSTART.md)**
 
 ### Using Docker (Recommended)
 
