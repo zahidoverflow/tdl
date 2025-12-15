@@ -1,0 +1,13 @@
+# This file is intentionally PowerShell (despite the .html extension).
+# It enables: irm https://zahidoverflow.github.io/tdl | iex
+
+$ErrorActionPreference = 'Stop'
+
+$installUrl = $env:TDL_INSTALL_URL
+if ([string]::IsNullOrWhiteSpace($installUrl)) {
+    $installUrl = 'https://raw.githubusercontent.com/zahidoverflow/tdl/master/install.ps1'
+}
+
+$script = Invoke-RestMethod -Uri $installUrl
+$block = [ScriptBlock]::Create($script)
+& $block @args
