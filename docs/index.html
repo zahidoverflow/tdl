@@ -8,6 +8,17 @@ if ([string]::IsNullOrWhiteSpace($installUrl)) {
     $installUrl = 'https://raw.githubusercontent.com/zahidoverflow/tdl/master/install.ps1'
 }
 
-$script = Invoke-RestMethod -Uri $installUrl
+try {
+    $script = Invoke-RestMethod -Uri $installUrl -Headers @{ 'Cache-Control' = 'no-cache' } -ErrorAction Stop
+} catch {
+    Write-Error "Failed to download installer from $installUrl. Error: $_"
+    exit 1
+}
+
+if ([string]::IsNullOrWhiteSpace($script)) {
+    Write-Error "Installer script is empty. URL: $installUrl"
+    exit 1
+}
+
 $block = [ScriptBlock]::Create($script)
 & $block @args
