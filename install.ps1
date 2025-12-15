@@ -171,8 +171,9 @@ $ChannelUrl = Resolve-ChatInput -InputValue $ChannelUrl
 Write-Host "✓ Target: $ChannelUrl" -ForegroundColor Green
 
 # Telegram login (first time)
-$configDir = Join-Path $env:USERPROFILE ".tdl"
-if (-not (Test-Path (Join-Path $configDir "data\data"))) {
+Write-Host "🔍 Checking Telegram session..." -ForegroundColor Gray
+& $tdlExePath chat ls -n $Namespace -s $storageOpt --limit 1 *>$null
+if ($LASTEXITCODE -ne 0) {
     Write-Host ""
     Write-Host "🔑 First time setup - Login to Telegram" -ForegroundColor Yellow
     while ($true) {
@@ -186,6 +187,8 @@ if (-not (Test-Path (Join-Path $configDir "data\data"))) {
         Write-Host "   Locks were cleared automatically; if it still fails, close any running tdl and retry." -ForegroundColor Yellow
         Read-Host "Press Enter to retry login (Ctrl+C to cancel)"
     }
+} else {
+    Write-Host "✓ Session valid" -ForegroundColor Green
 }
 
 # Google Drive credentials
