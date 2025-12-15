@@ -21,6 +21,7 @@ if ([string]::IsNullOrWhiteSpace($homeDir)) { $homeDir = $HOME }
 if ([string]::IsNullOrWhiteSpace($homeDir)) { $homeDir = [Environment]::GetFolderPath([Environment+SpecialFolder]::UserProfile) }
 if ([string]::IsNullOrWhiteSpace($homeDir)) { $homeDir = (Get-Location).Path }
 $configDir = Join-Path $homeDir ".tdl"
+$logFile = Join-Path $configDir "log\latest.log"
 
 function Get-TdlCommonArgs {
     $args = @("-n", $Namespace)
@@ -68,6 +69,32 @@ function Clear-TdlLocks {
     }
 }
 
+function Get-TdlLogTail {
+    param([int]$Lines = 80)
+    if (-not (Test-Path $logFile)) { return "" }
+    try {
+        return (Get-Content $logFile -Tail $Lines -ErrorAction Stop) -join "`n"
+    } catch {
+        return ""
+    }
+}
+
+function Show-TdlLogHint {
+    $tail = Get-TdlLogTail
+    if ([string]::IsNullOrWhiteSpace($tail)) { return }
+
+    if ($tail -match 'connectex' -and ($tail -match 'forbidden' -or $tail -match 'access .*socket')) {
+        Write-Host ""
+        Write-Host "⚠️ Telegram cannot reach MTProto (blocked by firewall/ISP)." -ForegroundColor Yellow
+        Write-Host "   Allow `tdl.exe` in Windows Firewall or use a VPN/proxy." -ForegroundColor Yellow
+        Write-Host "   Log: $logFile" -ForegroundColor DarkGray
+    } elseif ($tail -match 'unreachable network' -or $tail -match 'network is unreachable') {
+        Write-Host ""
+        Write-Host "⚠️ Telegram network is unreachable. Check internet or proxy settings." -ForegroundColor Yellow
+        Write-Host "   Log: $logFile" -ForegroundColor DarkGray
+    }
+}
+
 function Test-TdlDbLocked {
     param([string]$Text)
     return ($Text -match 'Current database is used by another process' -or
@@ -107,11 +134,13 @@ function Show-ChatList {
 
         Write-Host ""
         Write-Host "⚠️ Failed to list chats (exit=$exit). You can still paste a chat ID/username/link." -ForegroundColor Yellow
+        Show-TdlLogHint
         return $false
     }
 
     Write-Host ""
     Write-Host "⚠️ Still locked after retries. Close any running tdl.exe and try again." -ForegroundColor Yellow
+    Show-TdlLogHint
     return $false
 }
 
