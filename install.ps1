@@ -134,6 +134,11 @@ function Show-ChatList {
 
         Write-Host ""
         Write-Host "⚠️ Failed to list chats (exit=$exit). You can still paste a chat ID/username/link." -ForegroundColor Yellow
+        if ($exit -eq -1) {
+            Write-Host "   Exit -1 usually means Telegram's network is blocked (firewall, ISP or VPN requirement)." -ForegroundColor Yellow
+            Write-Host "   Allow `tdl.exe` in Windows Defender Firewall or configure a VPN / proxy." -ForegroundColor Yellow
+        }
+        Write-Host "   Log file: $logFile" -ForegroundColor DarkGray
         Show-TdlLogHint
         return $false
     }
