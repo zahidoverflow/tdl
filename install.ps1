@@ -97,6 +97,14 @@ function Show-ChatList {
             continue
         }
 
+        if ($text -match '(?i)not authorized|please login first') {
+            Write-Host ""
+            Write-Host "[warn] Telegram session not authorized. Re-login required." -ForegroundColor Yellow
+            Ensure-TelegramLogin
+            $attempt--
+            continue
+        }
+
         Write-Host ""
         Write-Host "⚠️ Failed to list chats (exit=$exit). You can still paste a chat ID/username/link." -ForegroundColor Yellow
         return $false
