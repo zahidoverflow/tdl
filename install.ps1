@@ -87,12 +87,13 @@ Write-Host "======================================" -ForegroundColor Cyan
 Write-Host ""
 
 if (-not $DownloadDir) {
+    $defaultDir = (Get-Location).Path
     Write-Host "?? Download Directory" -ForegroundColor Yellow
-    Write-Host "  Default: C:\tdl_temp" -ForegroundColor Gray
+    Write-Host "  Default: $defaultDir" -ForegroundColor Gray
     Write-Host ""
     $customDir = Read-Host "Enter download directory (press Enter for default)"
     if ([string]::IsNullOrWhiteSpace($customDir)) {
-        $DownloadDir = "C:\tdl_temp"
+        $DownloadDir = $defaultDir
     } else {
         $DownloadDir = $customDir.Trim()
     }
