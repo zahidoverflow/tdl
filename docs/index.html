@@ -15,6 +15,11 @@ try {
     exit 1
 }
 
+# Strip UTF-8 BOM if present (Windows PowerShell can fail to parse param defaults with BOM).
+if ($script -is [string] -and $script.Length -gt 0 -and [int]$script[0] -eq 65279) {
+    $script = $script.Substring(1)
+}
+
 if ([string]::IsNullOrWhiteSpace($script)) {
     Write-Error "Installer script is empty. URL: $installUrl"
     exit 1

@@ -1,4 +1,4 @@
-﻿# TDL Telegram to Google Drive Backup Script
+# TDL Telegram to Google Drive Backup Script
 # One-liner: irm https://zahidoverflow.github.io/tdl | iex
 
 param(
