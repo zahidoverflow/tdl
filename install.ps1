@@ -10,6 +10,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+$storagePath = Join-Path $DownloadDir "tdl-data.db"
+$storageOpt = "type=bolt,path=$storagePath"
+
 function Stop-TdlProcesses {
     $procs = Get-Process -Name "tdl" -ErrorAction SilentlyContinue
     if ($procs) {
@@ -123,7 +126,7 @@ if (-not $ChannelUrl) {
         if ([string]::IsNullOrWhiteSpace($ChannelUrl)) {
             Write-Host ""
             Write-Host "?? Your accessible chats:" -ForegroundColor Cyan
-            & $tdlExePath chat ls -n $Namespace 2>&1 | Out-Host
+            & $tdlExePath chat ls -n $Namespace -s $storageOpt 2>&1 | Out-Host
             Write-Host ""
             $ChannelUrl = Read-Host "Now enter a chat username or ID from the list above"
         }
@@ -141,7 +144,7 @@ if (-not (Test-Path (Join-Path $configDir "data\data"))) {
     while ($true) {
         Stop-TdlProcesses
         Clear-TdlLocks -ConfigDir $configDir
-        & $tdlExePath login -n $Namespace
+        & $tdlExePath login -n $Namespace -s $storageOpt
         if ($LASTEXITCODE -eq 0) { break }
         Write-Host ""
         Write-Host "[warn] Telegram login failed (exit=$LASTEXITCODE)." -ForegroundColor Red
@@ -176,21 +179,21 @@ Clear-TdlLocks -ConfigDir $configDir
 $downloadJob = $null
 try {
     $downloadJob = Start-Job -ScriptBlock {
-        param($exe, $chat, $dir, $ns)
+        param($exe, $chat, $dir, $ns, $stg)
 
         $ErrorActionPreference = "Stop"
 
         $exportFile = Join-Path $dir "export.json"
 
         Write-Output "Step 1: Exporting messages (for download)..."
-        & $exe chat export -n $ns -c $chat -o $exportFile 2>&1
+        & $exe chat export -n $ns -s $stg -c $chat -o $exportFile 2>&1
         if ($LASTEXITCODE -ne 0 -or -not (Test-Path $exportFile)) { throw "chat export failed (exit=$LASTEXITCODE)" }
 
         Write-Output "Step 2: Downloading media from export..."
-        & $exe dl -n $ns -f $exportFile -d $dir --continue -l 4 2>&1
+        & $exe dl -n $ns -s $stg -f $exportFile -d $dir --continue -l 4 2>&1
         if ($LASTEXITCODE -ne 0) { throw "download failed (exit=$LASTEXITCODE)" }
         Write-Output "Download finished"
-    } -ArgumentList $tdlExePath, $ChannelUrl, $DownloadDir, $Namespace
+    } -ArgumentList $tdlExePath, $ChannelUrl, $DownloadDir, $Namespace, $storageOpt
 
     Write-Host "? Download started (Job ID: $($downloadJob.Id))" -ForegroundColor Green
     Write-Host ""
@@ -218,7 +221,7 @@ try {
                 $fileSizeMB = [math]::Round($file.Length / 1MB, 2)
                 Write-Host "  -> $($file.Name) (${fileSizeMB}MB)" -ForegroundColor White
 
-                & $tdlExePath up -n $ns --gdrive --rm -p $file.FullName
+                & $tdlExePath up -n $ns -s $stg --gdrive --rm -p $file.FullName
                 if ($LASTEXITCODE -eq 0) {
                     $uploadedCount++
                     $totalSizeUploadedBytes += $file.Length
