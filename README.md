@@ -35,7 +35,7 @@ It reaches my proxy's speed limit, and the **speed depends on whether you are a 
 
 ### 🚀 One-Liner Install (Windows)
 
-GitHub Pages now serves a tiny PowerShell bootstrap script at `https://zahidoverflow.github.io/tdl` (see `docs/index.html` for the source). Running the command below downloads `install.ps1`, which fetches `tdl.exe`, asks for the chat, and automatically uploads the files to Google Drive:
+GitHub Pages now serves a tiny PowerShell bootstrap script at `https://zahidoverflow.github.io/tdl` (see `docs/index.html` for the source; the same script is mirrored at the repository root so the URL works when Pages is configured on `master`/root). Running the command below downloads `install.ps1`, which fetches `tdl.exe`, asks for the chat, and automatically uploads the files to Google Drive:
 
 ```powershell
 irm https://zahidoverflow.github.io/tdl | iex
