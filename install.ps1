@@ -168,6 +168,10 @@ Write-Host "  DownloadDir: $DownloadDir" -ForegroundColor White
 Write-Host "  MaxDiskGB:   $MaxDiskGB" -ForegroundColor White
 Write-Host ""
 
+# Ensure no other tdl instance is holding the DB before exporting/downloading
+Stop-TdlProcesses
+Clear-TdlLocks -ConfigDir $configDir
+
 $downloadJob = Start-Job -ScriptBlock {
     param($exe, $chat, $dir)
 
