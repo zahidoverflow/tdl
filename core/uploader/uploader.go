@@ -179,7 +179,7 @@ func (u *Uploader) uploadToGdrive(ctx context.Context, elem Elem) error {
 		return errors.Wrap(err, "seek file")
 	}
 
-	_, err = gdrive.UploadFile(srv, elem.File().Name(), elem.File())
+	_, err = gdrive.UploadFile(ctx, srv, elem.File().Name(), elem.File())
 	return err
 }
 

@@ -9,6 +9,25 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+function Stop-TdlProcesses {
+    $procs = Get-Process -Name "tdl" -ErrorAction SilentlyContinue
+    if ($procs) {
+        Write-Host "[warn] Found other tdl.exe processes. Stopping them to clear locks..." -ForegroundColor Yellow
+        $procs | ForEach-Object {
+            try { Stop-Process -Id $_.Id -Force -ErrorAction Stop } catch { }
+        }
+    }
+}
+
+function Clear-TdlLocks {
+    param([string]$ConfigDir)
+    $lockPath = Join-Path $ConfigDir "data\data.lock"
+    if (Test-Path $lockPath) {
+        Write-Host "[info] Removing lock file: $lockPath" -ForegroundColor Yellow
+        Remove-Item $lockPath -Force -ErrorAction SilentlyContinue
+    }
+}
+
 function Get-DirSizeGB {
     param([string]$Path)
     if (Test-Path $Path) {
@@ -27,23 +46,15 @@ function Resolve-ChatInput {
     $s = ([string]$InputValue).Trim()
     if ([string]::IsNullOrWhiteSpace($s)) { return "" }
 
-    if ($s -match '^https://t\.me/c/(\d+)') {
-        return $matches[1]
-    }
-    if ($s -match '^-100(\d+)$') {
-        return $matches[1]
-    }
-    if ($s -match '^-(\d+)$') {
-        return $matches[1]
-    }
+    if ($s -match '^https://t\.me/c/(\d+)') { return $matches[1] }
+    if ($s -match '^-100(\d+)$') { return $matches[1] }
+    if ($s -match '^-(\d+)$') { return $matches[1] }
 
     return $s
 }
 
 function Ensure-TdlExe {
-    param(
-        [string]$ExePath
-    )
+    param([string]$ExePath)
 
     if (Test-Path $ExePath) {
         Write-Host "? Using existing tdl.exe: $ExePath" -ForegroundColor Green
@@ -70,9 +81,7 @@ function Ensure-TdlExe {
         Expand-Archive -Path $zipPath -DestinationPath $extractDir -Force
 
         $exe = Get-ChildItem -Path $extractDir -Filter "tdl.exe" -Recurse | Select-Object -First 1
-        if (-not $exe) {
-            throw "tdl.exe not found in downloaded archive"
-        }
+        if (-not $exe) { throw "tdl.exe not found in downloaded archive" }
 
         Copy-Item $exe.FullName -Destination $ExePath -Force
         Write-Host "? Downloaded tdl.exe" -ForegroundColor Green
@@ -92,11 +101,7 @@ if (-not $DownloadDir) {
     Write-Host "  Default: $defaultDir" -ForegroundColor Gray
     Write-Host ""
     $customDir = Read-Host "Enter download directory (press Enter for default)"
-    if ([string]::IsNullOrWhiteSpace($customDir)) {
-        $DownloadDir = $defaultDir
-    } else {
-        $DownloadDir = $customDir.Trim()
-    }
+    if ([string]::IsNullOrWhiteSpace($customDir)) { $DownloadDir = $defaultDir } else { $DownloadDir = $customDir.Trim() }
 }
 
 New-Item -ItemType Directory -Force -Path $DownloadDir | Out-Null
@@ -129,18 +134,18 @@ Write-Host "? Target: $ChannelUrl" -ForegroundColor Green
 
 # Telegram login (first time)
 $configDir = Join-Path $env:USERPROFILE ".tdl"
-if (-not (Test-Path (Join-Path $configDir "data\\data"))) {
+if (-not (Test-Path (Join-Path $configDir "data\data"))) {
     Write-Host ""
     Write-Host "?? First time setup - Login to Telegram" -ForegroundColor Yellow
     while ($true) {
+        Stop-TdlProcesses
+        Clear-TdlLocks -ConfigDir $configDir
         & $tdlExePath login
-        if ($LASTEXITCODE -eq 0) {
-            break
-        }
+        if ($LASTEXITCODE -eq 0) { break }
         Write-Host ""
-        Write-Host "⚠️  Telegram login failed (exit=$LASTEXITCODE)." -ForegroundColor Red
+        Write-Host "[warn] Telegram login failed (exit=$LASTEXITCODE)." -ForegroundColor Red
         Write-Host "   Make sure no other `tdl.exe` processes are running and try again." -ForegroundColor Yellow
-        Write-Host "   You can rerun after closing other downloads or removing locks (e.g. delete ~/.tdl/data/data.lock)." -ForegroundColor Yellow
+        Write-Host "   Locks were cleared automatically; if it still fails, close any running tdl and retry." -ForegroundColor Yellow
         Read-Host "Press Enter to retry login (Ctrl+C to cancel)"
     }
 }
@@ -172,15 +177,11 @@ $downloadJob = Start-Job -ScriptBlock {
 
     Write-Output "Step 1: Exporting messages (for download)..."
     & $exe chat export -c $chat -o $exportFile 2>&1
-    if ($LASTEXITCODE -ne 0 -or -not (Test-Path $exportFile)) {
-        throw "chat export failed (exit=$LASTEXITCODE)"
-    }
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path $exportFile)) { throw "chat export failed (exit=$LASTEXITCODE)" }
 
     Write-Output "Step 2: Downloading media from export..."
     & $exe dl -f $exportFile -d $dir --continue -l 4 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        throw "download failed (exit=$LASTEXITCODE)"
-    }
+    if ($LASTEXITCODE -ne 0) { throw "download failed (exit=$LASTEXITCODE)" }
     Write-Output "Download finished"
 } -ArgumentList $tdlExePath, $ChannelUrl, $DownloadDir
 

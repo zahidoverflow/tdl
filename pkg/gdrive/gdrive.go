@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"time"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -18,6 +20,12 @@ import (
 const (
 	credentialsFile = "gdrive_credentials.json"
 	tokenFile       = "gdrive_token.json"
+)
+
+var (
+	folderMu       sync.Mutex
+	cachedDate     string
+	cachedFolderID string
 )
 
 // GetClient retrieves a Google Drive client, handling OAuth2 authentication.
@@ -115,12 +123,57 @@ func saveToken(path string, token *oauth2.Token) {
 	json.NewEncoder(f).Encode(token)
 }
 
-// UploadFile uploads a file to Google Drive.
-func UploadFile(srv *drive.Service, name string, content io.Reader) (*drive.File, error) {
-	file := &drive.File{
-		Name: name,
+func getDateFolderID(ctx context.Context, srv *drive.Service) (string, error) {
+	today := time.Now().Format("2006-01-02")
+
+	folderMu.Lock()
+	defer folderMu.Unlock()
+
+	if cachedDate == today && cachedFolderID != "" {
+		return cachedFolderID, nil
 	}
-	f, err := srv.Files.Create(file).Media(content).Do()
+
+	q := fmt.Sprintf("mimeType = 'application/vnd.google-apps.folder' and name = '%s' and 'root' in parents and trashed = false", today)
+	res, err := srv.Files.List().
+		Q(q).
+		PageSize(1).
+		Fields("files(id,name)").
+		Context(ctx).
+		Do()
+	if err == nil && len(res.Files) > 0 {
+		cachedDate = today
+		cachedFolderID = res.Files[0].Id
+		return cachedFolderID, nil
+	}
+
+	folder := &drive.File{
+		Name:     today,
+		MimeType: "application/vnd.google-apps.folder",
+		Parents:  []string{"root"},
+	}
+
+	created, err := srv.Files.Create(folder).Context(ctx).Do()
+	if err != nil {
+		return "", err
+	}
+
+	cachedDate = today
+	cachedFolderID = created.Id
+	return cachedFolderID, nil
+}
+
+// UploadFile uploads a file to Google Drive under a date-based folder (YYYY-MM-DD) at root.
+func UploadFile(ctx context.Context, srv *drive.Service, name string, content io.Reader) (*drive.File, error) {
+	folderID, err := getDateFolderID(ctx, srv)
+	if err != nil {
+		return nil, fmt.Errorf("resolve date folder: %w", err)
+	}
+
+	file := &drive.File{
+		Name:    name,
+		Parents: []string{folderID},
+	}
+	f, err := srv.Files.Create(file).Context(ctx).Media(content).Do()
 	if err != nil {
 		// Check for common Google Drive API errors and provide helpful messages
 		errMsg := err.Error()
