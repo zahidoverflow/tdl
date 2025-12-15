@@ -173,112 +173,112 @@ Write-Host ""
 Stop-TdlProcesses
 Clear-TdlLocks -ConfigDir $configDir
 
-$downloadJob = Start-Job -ScriptBlock {
-    param($exe, $chat, $dir, $ns)
+$downloadJob = $null
+try {
+    $downloadJob = Start-Job -ScriptBlock {
+        param($exe, $chat, $dir, $ns)
 
-    $ErrorActionPreference = "Stop"
+        $ErrorActionPreference = "Stop"
 
-    $exportFile = Join-Path $dir "export.json"
+        $exportFile = Join-Path $dir "export.json"
 
-    Write-Output "Step 1: Exporting messages (for download)..."
-    & $exe chat export -n $ns -c $chat -o $exportFile 2>&1
-    if ($LASTEXITCODE -ne 0 -or -not (Test-Path $exportFile)) { throw "chat export failed (exit=$LASTEXITCODE)" }
+        Write-Output "Step 1: Exporting messages (for download)..."
+        & $exe chat export -n $ns -c $chat -o $exportFile 2>&1
+        if ($LASTEXITCODE -ne 0 -or -not (Test-Path $exportFile)) { throw "chat export failed (exit=$LASTEXITCODE)" }
 
-    Write-Output "Step 2: Downloading media from export..."
-    & $exe dl -n $ns -f $exportFile -d $dir --continue -l 4 2>&1
-    if ($LASTEXITCODE -ne 0) { throw "download failed (exit=$LASTEXITCODE)" }
-    Write-Output "Download finished"
-} -ArgumentList $tdlExePath, $ChannelUrl, $DownloadDir, $Namespace
+        Write-Output "Step 2: Downloading media from export..."
+        & $exe dl -n $ns -f $exportFile -d $dir --continue -l 4 2>&1
+        if ($LASTEXITCODE -ne 0) { throw "download failed (exit=$LASTEXITCODE)" }
+        Write-Output "Download finished"
+    } -ArgumentList $tdlExePath, $ChannelUrl, $DownloadDir, $Namespace
 
-Write-Host "? Download started (Job ID: $($downloadJob.Id))" -ForegroundColor Green
-Write-Host ""
+    Write-Host "? Download started (Job ID: $($downloadJob.Id))" -ForegroundColor Green
+    Write-Host ""
 
-$uploadedCount = 0
-$totalSizeUploadedBytes = 0
-$lastStatus = Get-Date
+    $uploadedCount = 0
+    $totalSizeUploadedBytes = 0
+    $lastStatus = Get-Date
 
-while ($true) {
-    $jobState = (Get-Job -Id $downloadJob.Id).State
-    $currentSize = Get-DirSizeGB -Path $DownloadDir
+    while ($true) {
+        $jobState = (Get-Job -Id $downloadJob.Id).State
+        $currentSize = Get-DirSizeGB -Path $DownloadDir
 
-    $files = Get-ChildItem $DownloadDir -File -ErrorAction SilentlyContinue |
-        Where-Object {
-            $_.Name -ne "tdl.exe" -and
-            $_.Name -ne "export.json" -and
-            $_.Extension -notin @(".tmp", ".part") -and
-            -not $_.Name.EndsWith(".downloading") -and
-            $_.Length -gt 1MB
-        }
-
-    if ($files.Count -gt 0) {
-        Write-Host "?? Found $($files.Count) file(s) ready for upload" -ForegroundColor Yellow
-        foreach ($file in $files) {
-            $fileSizeMB = [math]::Round($file.Length / 1MB, 2)
-            Write-Host "  -> $($file.Name) (${fileSizeMB}MB)" -ForegroundColor White
-
-            & $tdlExePath up -n $ns --gdrive --rm -p $file.FullName
-            if ($LASTEXITCODE -eq 0) {
-                $uploadedCount++
-                $totalSizeUploadedBytes += $file.Length
-                Write-Host "     ? Uploaded & deleted" -ForegroundColor Green
-            } else {
-                Write-Host "     ?? Upload failed, keeping file" -ForegroundColor Yellow
+        $files = Get-ChildItem $DownloadDir -File -ErrorAction SilentlyContinue |
+            Where-Object {
+                $_.Name -ne "tdl.exe" -and
+                $_.Name -ne "export.json" -and
+                $_.Extension -notin @('.tmp', '.part') -and
+                -not $_.Name.EndsWith('.downloading') -and
+                $_.Length -gt 1MB
             }
 
-            Start-Sleep -Seconds 2
+        if ($files.Count -gt 0) {
+            Write-Host "?? Found $($files.Count) file(s) ready for upload" -ForegroundColor Yellow
+            foreach ($file in $files) {
+                $fileSizeMB = [math]::Round($file.Length / 1MB, 2)
+                Write-Host "  -> $($file.Name) (${fileSizeMB}MB)" -ForegroundColor White
+
+                & $tdlExePath up -n $ns --gdrive --rm -p $file.FullName
+                if ($LASTEXITCODE -eq 0) {
+                    $uploadedCount++
+                    $totalSizeUploadedBytes += $file.Length
+                    Write-Host "     ? Uploaded & deleted" -ForegroundColor Green
+                } else {
+                    Write-Host "     ?? Upload failed, keeping file" -ForegroundColor Yellow
+                }
+
+                Start-Sleep -Seconds 2
+            }
+            Write-Host ""
         }
-        Write-Host ""
-    }
 
-    $now = Get-Date
-    if (($now - $lastStatus).TotalSeconds -ge 30) {
-        $uploadedGB = [math]::Round($totalSizeUploadedBytes / 1GB, 2)
-        Write-Host "?? Status: Uploaded $uploadedCount files (${uploadedGB}GB) | Disk: ${currentSize}GB/${MaxDiskGB}GB | Job: $jobState" -ForegroundColor Cyan
-        $lastStatus = $now
-    }
-
-    $jobOutput = Receive-Job -Id $downloadJob.Id -Keep -ErrorAction SilentlyContinue
-    if ($jobOutput) {
-        $jobOutput | Select-Object -Last 3 | ForEach-Object {
-            Write-Host "  [Download] $_" -ForegroundColor DarkGray
+        $now = Get-Date
+        if (($now - $lastStatus).TotalSeconds -ge 30) {
+            $uploadedGB = [math]::Round($totalSizeUploadedBytes / 1GB, 2)
+            Write-Host "?? Status: Uploaded $uploadedCount files (${uploadedGB}GB) | Disk: ${currentSize}GB/${MaxDiskGB}GB | Job: $jobState" -ForegroundColor Cyan
+            $lastStatus = $now
         }
-    }
 
-    if ($currentSize -ge $MaxDiskGB) {
-        Write-Host "?? Disk limit reached (${currentSize}GB >= ${MaxDiskGB}GB). Waiting for uploads to free space..." -ForegroundColor Red
+        $jobOutput = Receive-Job -Id $downloadJob.Id -Keep -ErrorAction SilentlyContinue
+        if ($jobOutput) {
+            $jobOutput | Select-Object -Last 3 | ForEach-Object {
+                Write-Host "  [Download] $_" -ForegroundColor DarkGray
+            }
+        }
+
+        if ($currentSize -ge $MaxDiskGB) {
+            Write-Host "?? Disk limit reached (${currentSize}GB >= ${MaxDiskGB}GB). Waiting for uploads to free space..." -ForegroundColor Red
+            Start-Sleep -Seconds 10
+            continue
+        }
+
+        if ($jobState -eq 'Completed' -and $files.Count -eq 0) {
+            Write-Host ""
+            Write-Host "? Download complete and all files uploaded!" -ForegroundColor Green
+            break
+        }
+
+        if ($jobState -eq 'Failed') {
+            Write-Host ""
+            Write-Host "? Download job failed!" -ForegroundColor Red
+            Receive-Job -Id $downloadJob.Id -ErrorAction SilentlyContinue | ForEach-Object {
+                Write-Host "  $_" -ForegroundColor Red
+            }
+            break
+        }
+
         Start-Sleep -Seconds 10
-        continue
     }
-
-    if ($jobState -eq "Completed" -and $files.Count -eq 0) {
-        Write-Host ""
-        Write-Host "? Download complete and all files uploaded!" -ForegroundColor Green
-        break
+}
+finally {
+    if ($downloadJob) {
+        Remove-Job -Id $downloadJob.Id -Force -ErrorAction SilentlyContinue
     }
-
-    if ($jobState -eq "Failed") {
-        Write-Host ""
-        Write-Host "? Download job failed!" -ForegroundColor Red
-        Receive-Job -Id $downloadJob.Id -ErrorAction SilentlyContinue | ForEach-Object {
-            Write-Host "  $_" -ForegroundColor Red
-        }
-        break
-    }
-
-    Start-Sleep -Seconds 10
+    Stop-TdlProcesses
 }
 
 Write-Host ""
 Write-Host "?? Cleaning up..." -ForegroundColor Yellow
-Remove-Job -Id $downloadJob.Id -Force -ErrorAction SilentlyContinue
-
-$finalGB = [math]::Round($totalSizeUploadedBytes / 1GB, 2)
-Write-Host ""
-Write-Host "?? Backup Complete!" -ForegroundColor Green
-Write-Host "Files uploaded: $uploadedCount" -ForegroundColor White
-Write-Host "Total size: ${finalGB}GB" -ForegroundColor White
-Write-Host ""
-
 $cleanup = Read-Host "Delete download directory? (y/N)"
 if ($cleanup -eq "y" -or $cleanup -eq "Y") {
     Remove-Item $DownloadDir -Recurse -Force -ErrorAction SilentlyContinue
