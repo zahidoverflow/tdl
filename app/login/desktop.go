@@ -82,10 +82,10 @@ func Desktop(ctx context.Context, opts Options) error {
 
 	// logout
 	confirm, logout := &survey.Confirm{
-		Message: "Do you want to logout existing desktop session?",
+		Message: "Logout existing desktop session? (default: keep it logged in)",
 		Default: false,
-		Help: "Logout existing desktop session to separate from imported session, which can prevent session conflict." +
-			"\n NB: Ensure that you can re-login to desktop client",
+		Help: "Default is No — keeping the desktop session logged in avoids unexpected sign-outs." +
+			"\nChoose Yes only if you want to disconnect the desktop client to prevent session conflicts.",
 	}, false
 	if err = survey.AskOne(confirm, &logout); err != nil {
 		return err
