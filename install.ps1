@@ -1,4 +1,4 @@
-# TDL Telegram to Google Drive Backup Script
+﻿# TDL Telegram to Google Drive Backup Script
 # One-liner: irm https://zahidoverflow.github.io/tdl | iex
 
 param(
@@ -12,6 +12,10 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+$Namespace = ([string]$Namespace).Trim()
+if ([string]::IsNullOrWhiteSpace($Namespace)) { $Namespace = "default" }
+$Storage = ([string]$Storage).Trim()
+
 $homeDir = $env:USERPROFILE
 if ([string]::IsNullOrWhiteSpace($homeDir)) { $homeDir = $HOME }
 if ([string]::IsNullOrWhiteSpace($homeDir)) { $homeDir = [Environment]::GetFolderPath([Environment+SpecialFolder]::UserProfile) }
@@ -23,7 +27,7 @@ function Get-TdlCommonArgs {
     if (-not [string]::IsNullOrWhiteSpace($Storage)) {
         $args += @("--storage", $Storage)
     }
-    return ,$args
+    return $args
 }
 
 function Get-TdlStorageDir {
@@ -64,6 +68,45 @@ function Clear-TdlLocks {
     }
 }
 
+function Test-TdlDbLocked {
+    param([string]$Text)
+    return ($Text -match 'Current database is used by another process' -or
+            $Text -match 'database is locked' -or
+            $Text -match 'resource temporarily unavailable')
+}
+
+function Show-ChatList {
+    param([string]$ExePath)
+
+    $commonArgs = Get-TdlCommonArgs
+    for ($attempt = 1; $attempt -le 5; $attempt++) {
+        Stop-TdlProcesses
+        Clear-TdlLocks -ConfigDir $configDir
+        Start-Sleep -Milliseconds 700
+
+        $out = & $ExePath chat ls @commonArgs 2>&1
+        $exit = $LASTEXITCODE
+        $text = ($out | Out-String)
+        $out | Out-Host
+
+        if ($exit -eq 0) { return $true }
+        if (Test-TdlDbLocked -Text $text) {
+            Write-Host ""
+            Write-Host "⚠️ TDL database is locked. Retrying... ($attempt/5)" -ForegroundColor Yellow
+            Start-Sleep -Seconds ([math]::Min(5, $attempt))
+            continue
+        }
+
+        Write-Host ""
+        Write-Host "⚠️ Failed to list chats (exit=$exit). You can still paste a chat ID/username/link." -ForegroundColor Yellow
+        return $false
+    }
+
+    Write-Host ""
+    Write-Host "⚠️ Still locked after retries. Close any running tdl.exe and try again." -ForegroundColor Yellow
+    return $false
+}
+
 $script:ActiveDownloadJobId = $null
 
 function Invoke-Cleanup {
@@ -83,7 +126,8 @@ function Ensure-TelegramLogin {
         Clear-TdlLocks -ConfigDir $configDir
         Start-Sleep -Seconds 1
 
-        & $tdlExePath login @(Get-TdlCommonArgs)
+        $commonArgs = Get-TdlCommonArgs
+        & $tdlExePath login @commonArgs
         if ($LASTEXITCODE -eq 0) {
             $script:DidLoginThisRun = $true
             return
@@ -166,19 +210,21 @@ function Ensure-TdlExe {
 function Upload-Files {
     param($Dir, $Exe, $Ns)
 
-    $commonArgs = @("-n", $Ns)
+    if (-not (Test-Path $Dir)) { return 0 }
+
+    $commonArgs = @("-n", ([string]$Ns).Trim())
     if (-not [string]::IsNullOrWhiteSpace($Storage)) {
         $commonArgs += @("--storage", $Storage)
     }
     
-    $files = Get-ChildItem $Dir -File -ErrorAction SilentlyContinue |
+    $files = @(Get-ChildItem $Dir -File -Recurse -ErrorAction SilentlyContinue |
             Where-Object {
                 $_.Name -ne "tdl.exe" -and
                 $_.Name -ne "export.json" -and
                 $_.Extension -notin @('.tmp', '.part') -and
                 -not $_.Name.EndsWith('.downloading') -and
                 $_.Length -gt 0
-            }
+            })
 
     if ($files.Count -eq 0) { return 0 }
 
@@ -188,7 +234,7 @@ function Upload-Files {
         $fileSizeMB = [math]::Round($file.Length / 1MB, 2)
         Write-Host "  -> $($file.Name) (${fileSizeMB}MB)" -ForegroundColor White
 
-        & $Exe up @commonArgs --gdrive --rm -p $file.FullName
+        & $Exe up @commonArgs --gdrive --rm -p $file.FullName 2>&1 | Out-Host
         if ($LASTEXITCODE -eq 0) {
             $count++
             Write-Host "     ✓ Uploaded & deleted" -ForegroundColor Green
@@ -196,7 +242,7 @@ function Upload-Files {
             Write-Host "     ❌ Upload failed, keeping file" -ForegroundColor Red
         }
     }
-    return $count
+    return [int]$count
 }
 
 try {
@@ -215,6 +261,8 @@ if (-not $DownloadDir) {
 
 New-Item -ItemType Directory -Force -Path $DownloadDir | Out-Null
 $tdlExePath = Join-Path $DownloadDir "tdl.exe"
+$mediaDir = Join-Path $DownloadDir "tdl-downloads"
+$null = New-Item -ItemType Directory -Force -Path $mediaDir -ErrorAction SilentlyContinue
 
 Ensure-TdlExe -ExePath $tdlExePath
 Set-Location $DownloadDir
@@ -226,7 +274,16 @@ Clear-TdlLocks -ConfigDir $configDir
 $script:DidLoginThisRun = $false
 
 $storageDir = Get-TdlStorageDir
+$null = New-Item -ItemType Directory -Force -Path $storageDir -ErrorAction SilentlyContinue
 $namespaceFile = Join-Path $storageDir $Namespace
+$legacyNamespaceFile = Join-Path $storageDir (" " + $Namespace)
+if ((Test-Path $namespaceFile) -and (Test-Path $legacyNamespaceFile)) {
+    Write-Host "[warn] Found both namespaces '$Namespace' and ' $Namespace'. Using '$Namespace'." -ForegroundColor Yellow
+} elseif ((-not (Test-Path $namespaceFile)) -and (Test-Path $legacyNamespaceFile)) {
+    Write-Host "[warn] Found legacy namespace file: $legacyNamespaceFile" -ForegroundColor Yellow
+    Write-Host "[warn] Renaming it to: $namespaceFile" -ForegroundColor Yellow
+    try { Move-Item -Path $legacyNamespaceFile -Destination $namespaceFile -Force -ErrorAction Stop } catch { }
+}
 if (-not (Test-Path $namespaceFile)) {
     Ensure-TelegramLogin
 } else {
@@ -268,7 +325,7 @@ if (-not $ChannelUrl) {
         if ([string]::IsNullOrWhiteSpace($ChannelUrl)) {
             Write-Host ""
             Write-Host "📋 Your accessible chats:" -ForegroundColor Cyan
-            & $tdlExePath chat ls @(Get-TdlCommonArgs)
+            $null = Show-ChatList -ExePath $tdlExePath
             Write-Host ""
             $ChannelUrl = Read-Host "Now enter a chat username or ID from the list above"
         }
@@ -281,6 +338,7 @@ Write-Host "✓ Target: $ChannelUrl" -ForegroundColor Green
 Write-Host ""
 Write-Host "🚀 Starting backup" -ForegroundColor Cyan
 Write-Host "  DownloadDir: $DownloadDir" -ForegroundColor White
+Write-Host "  MediaDir:    $mediaDir" -ForegroundColor White
 Write-Host "  MaxDiskGB:   $MaxDiskGB" -ForegroundColor White
 Write-Host ""
 
@@ -301,7 +359,8 @@ if (-not (Test-Path $exportFile)) {
         Stop-TdlProcesses
         Clear-TdlLocks -ConfigDir $configDir
 
-        & $tdlExePath chat export @(Get-TdlCommonArgs) -c $ChannelUrl -o $exportFile
+        $commonArgs = Get-TdlCommonArgs
+        & $tdlExePath chat export @commonArgs -c $ChannelUrl -o $exportFile
         if ($LASTEXITCODE -eq 0) { break }
 
         Remove-Item $exportFile -Force -ErrorAction SilentlyContinue
@@ -329,6 +388,8 @@ $downloadFailureCount = 0
 while ($true) {
     # Clean up any locks from previous iteration
     Stop-TdlProcesses
+    Clear-TdlLocks -ConfigDir $configDir
+    Start-Sleep -Milliseconds 700
     
     # Check if download is complete (hacky way: tdl dl returns 0 if done, or we check output)
     # We run tdl dl as a Job so we can kill it when disk fills up
@@ -339,7 +400,7 @@ while ($true) {
         # --continue is key here
         & $exe dl @commonArgs -f $ef -d $dir --continue -l 4
         if ($LASTEXITCODE -ne 0) { throw "tdl download failed (exit=$LASTEXITCODE)" }
-    } -ArgumentList $tdlExePath, (Get-TdlCommonArgs), $exportFile, $DownloadDir
+    } -ArgumentList $tdlExePath, (Get-TdlCommonArgs), $exportFile, $mediaDir
     $script:ActiveDownloadJobId = $dlJob.Id
 
     Write-Host "⬇️ Downloading... (Job: $($dlJob.Id))" -ForegroundColor Cyan
@@ -357,9 +418,25 @@ while ($true) {
             break
         }
         if ($state -eq 'Failed') {
-            Receive-Job -Id $dlJob.Id -ErrorAction SilentlyContinue | Out-Host
+            $jobOut = Receive-Job -Id $dlJob.Id -ErrorAction SilentlyContinue 2>&1
+            $jobText = ($jobOut | Out-String)
+            $jobOut | Out-Host
             $jobFailed = $true
             $downloadFailureCount++
+
+            if ($jobText -match '(?i)not authorized|please login first') {
+                Write-Host ""
+                Write-Host "⚠️ Telegram session not authorized. Re-login required." -ForegroundColor Yellow
+                Ensure-TelegramLogin
+                $downloadFailureCount = 0
+                break
+            }
+
+            if (Test-TdlDbLocked -Text $jobText) {
+                Write-Host ""
+                Write-Host "⚠️ TDL database is locked. Retrying after cleanup..." -ForegroundColor Yellow
+            }
+
             if ($downloadFailureCount -ge 3) {
                 throw "Download job failed too many times. If you see a database lock error, close other tdl.exe processes and rerun."
             }
@@ -373,7 +450,7 @@ while ($true) {
         }
         
         # Check Disk Usage
-        $size = Get-DirSizeGB -Path $DownloadDir
+        $size = Get-DirSizeGB -Path $mediaDir
         if ($size -ge $uploadTriggerGB) {
             Write-Host "⚠️ Disk threshold reached (${size}GB). Pausing download to upload..." -ForegroundColor Yellow
             Stop-Job -Id $dlJob.Id -Force
@@ -391,13 +468,13 @@ while ($true) {
     Remove-Job -Id $dlJob.Id -Force -ErrorAction SilentlyContinue
     $script:ActiveDownloadJobId = $null
 
-    $uploaded = Upload-Files -Dir $DownloadDir -Exe $tdlExePath -Ns $Namespace
+    $uploaded = Upload-Files -Dir $mediaDir -Exe $tdlExePath -Ns $Namespace
     $totalUploaded += $uploaded
     
     if ($jobComplete) {
         Write-Host "✅ Download job finished." -ForegroundColor Green
         # Final cleanup check
-        $remaining = Upload-Files -Dir $DownloadDir -Exe $tdlExePath -Ns $Namespace
+        $remaining = Upload-Files -Dir $mediaDir -Exe $tdlExePath -Ns $Namespace
         $totalUploaded += $remaining
         break
     }
@@ -407,9 +484,9 @@ Write-Host ""
 Write-Host "🎉 Backup Complete!" -ForegroundColor Green
 Write-Host "Total files uploaded: $totalUploaded"
 
-$cleanup = Read-Host "Delete download directory? (y/N)"
+$cleanup = Read-Host "Delete downloaded files folder (tdl-downloads)? (y/N)"
 if ($cleanup -eq "y" -or $cleanup -eq "Y") {
-    Remove-Item $DownloadDir -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item $mediaDir -Recurse -Force -ErrorAction SilentlyContinue
     Write-Host "✓ Cleanup complete" -ForegroundColor Green
 }
 } catch {

@@ -49,6 +49,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://zahidoverflo
 
 Notes:
 - `tdl.exe` is downloaded into the current directory (where you run the command).
+- Downloaded media is saved under `./tdl-downloads/` (so running from `Downloads` won’t upload/delete unrelated files).
 - Config + credentials live in `~/.tdl/`:
   - `~/.tdl/gdrive_credentials.json`
   - `~/.tdl/gdrive_token.json` (auto-created after first auth)
