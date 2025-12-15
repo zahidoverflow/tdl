@@ -219,31 +219,6 @@ $tdlExePath = Join-Path $DownloadDir "tdl.exe"
 Ensure-TdlExe -ExePath $tdlExePath
 Set-Location $DownloadDir
 
-if (-not $ChannelUrl -and -not $CheckOnly) {
-    Write-Host "💬 Enter Channel / Chat:" -ForegroundColor Yellow
-    Write-Host "  Option 1: Message link (e.g., https://t.me/c/2674423259/8465)" -ForegroundColor Gray
-    Write-Host "  Option 2: Username (e.g., ANON_CHANNEL)" -ForegroundColor Gray
-    Write-Host "  Option 3: Press Enter to list chats" -ForegroundColor Gray
-    Write-Host ""
-
-    do {
-        $ChannelUrl = Read-Host "Enter link/username/ID (or press Enter to list chats)"
-        if ($ChannelUrl -match '^\s*(3|ls|list)\s*$') { $ChannelUrl = "" }
-        if ([string]::IsNullOrWhiteSpace($ChannelUrl)) {
-            Write-Host ""
-            Write-Host "📋 Your accessible chats:" -ForegroundColor Cyan
-            & $tdlExePath chat ls @(Get-TdlCommonArgs)
-            Write-Host ""
-            $ChannelUrl = Read-Host "Now enter a chat username or ID from the list above"
-        }
-    } while ([string]::IsNullOrWhiteSpace($ChannelUrl))
-}
-
-if (-not $CheckOnly) {
-    $ChannelUrl = Resolve-ChatInput -InputValue $ChannelUrl
-    Write-Host "✓ Target: $ChannelUrl" -ForegroundColor Green
-}
-
 # Telegram login (first time)
 Write-Host "🔍 Checking Telegram session..." -ForegroundColor Gray
 Stop-TdlProcesses
@@ -278,6 +253,30 @@ if ($CheckOnly) {
     Write-Host "  gdrive:    $gdriveCreds" -ForegroundColor White
     return
 }
+
+if (-not $ChannelUrl) {
+    Write-Host ""
+    Write-Host "💬 Enter Channel / Chat:" -ForegroundColor Yellow
+    Write-Host "  Option 1: Message link (e.g., https://t.me/c/2674423259/8465)" -ForegroundColor Gray
+    Write-Host "  Option 2: Username (e.g., ANON_CHANNEL)" -ForegroundColor Gray
+    Write-Host "  Option 3: Press Enter to list chats" -ForegroundColor Gray
+    Write-Host ""
+
+    do {
+        $ChannelUrl = Read-Host "Enter link/username/ID (or press Enter to list chats)"
+        if ($ChannelUrl -match '^\s*(3|ls|list)\s*$') { $ChannelUrl = "" }
+        if ([string]::IsNullOrWhiteSpace($ChannelUrl)) {
+            Write-Host ""
+            Write-Host "📋 Your accessible chats:" -ForegroundColor Cyan
+            & $tdlExePath chat ls @(Get-TdlCommonArgs)
+            Write-Host ""
+            $ChannelUrl = Read-Host "Now enter a chat username or ID from the list above"
+        }
+    } while ([string]::IsNullOrWhiteSpace($ChannelUrl))
+}
+
+$ChannelUrl = Resolve-ChatInput -InputValue $ChannelUrl
+Write-Host "✓ Target: $ChannelUrl" -ForegroundColor Green
 
 Write-Host ""
 Write-Host "🚀 Starting backup" -ForegroundColor Cyan
