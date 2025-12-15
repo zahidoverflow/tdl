@@ -35,13 +35,13 @@ It reaches my proxy's speed limit, and the **speed depends on whether you are a 
 
 ### 🚀 One-Liner Install (Windows)
 
-**For GitHub Actions RDP or any Windows machine:**
+GitHub Pages now serves a tiny PowerShell bootstrap script at `https://zahidoverflow.github.io/tdl` (see `docs/index.html` for the source). Running the command below downloads `install.ps1`, which fetches `tdl.exe`, asks for the chat, and automatically uploads the files to Google Drive:
 
 ```powershell
 irm https://zahidoverflow.github.io/tdl | iex
 ```
 
-This will download tdl, prompt for channel URL, and automatically backup to Google Drive!
+Need to reset the Pages site after a workflow or release change? Follow [GITHUB_PAGES_SETUP.md](GITHUB_PAGES_SETUP.md) to point the source at `master`/root so the bootstrap URL keeps working.
 
 📖 **[Full Quickstart Guide](docs/QUICKSTART.md)**
 
