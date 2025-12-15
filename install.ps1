@@ -4,7 +4,8 @@
 param(
     [string]$ChannelUrl,
     [string]$DownloadDir,
-    [int]$MaxDiskGB = 45
+    [int]$MaxDiskGB = 45,
+    [string]$Namespace = "installer"
 )
 
 $ErrorActionPreference = "Stop"
@@ -122,7 +123,7 @@ if (-not $ChannelUrl) {
         if ([string]::IsNullOrWhiteSpace($ChannelUrl)) {
             Write-Host ""
             Write-Host "?? Your accessible chats:" -ForegroundColor Cyan
-            & $tdlExePath chat ls 2>&1 | Out-Host
+            & $tdlExePath chat ls -n $Namespace 2>&1 | Out-Host
             Write-Host ""
             $ChannelUrl = Read-Host "Now enter a chat username or ID from the list above"
         }
@@ -140,7 +141,7 @@ if (-not (Test-Path (Join-Path $configDir "data\data"))) {
     while ($true) {
         Stop-TdlProcesses
         Clear-TdlLocks -ConfigDir $configDir
-        & $tdlExePath login
+        & $tdlExePath login -n $Namespace
         if ($LASTEXITCODE -eq 0) { break }
         Write-Host ""
         Write-Host "[warn] Telegram login failed (exit=$LASTEXITCODE)." -ForegroundColor Red
@@ -173,21 +174,21 @@ Stop-TdlProcesses
 Clear-TdlLocks -ConfigDir $configDir
 
 $downloadJob = Start-Job -ScriptBlock {
-    param($exe, $chat, $dir)
+    param($exe, $chat, $dir, $ns)
 
     $ErrorActionPreference = "Stop"
 
     $exportFile = Join-Path $dir "export.json"
 
     Write-Output "Step 1: Exporting messages (for download)..."
-    & $exe chat export -c $chat -o $exportFile 2>&1
+    & $exe chat export -n $ns -c $chat -o $exportFile 2>&1
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path $exportFile)) { throw "chat export failed (exit=$LASTEXITCODE)" }
 
     Write-Output "Step 2: Downloading media from export..."
-    & $exe dl -f $exportFile -d $dir --continue -l 4 2>&1
+    & $exe dl -n $ns -f $exportFile -d $dir --continue -l 4 2>&1
     if ($LASTEXITCODE -ne 0) { throw "download failed (exit=$LASTEXITCODE)" }
     Write-Output "Download finished"
-} -ArgumentList $tdlExePath, $ChannelUrl, $DownloadDir
+} -ArgumentList $tdlExePath, $ChannelUrl, $DownloadDir, $Namespace
 
 Write-Host "? Download started (Job ID: $($downloadJob.Id))" -ForegroundColor Green
 Write-Host ""
@@ -215,7 +216,7 @@ while ($true) {
             $fileSizeMB = [math]::Round($file.Length / 1MB, 2)
             Write-Host "  -> $($file.Name) (${fileSizeMB}MB)" -ForegroundColor White
 
-            & $tdlExePath up --gdrive --rm -p $file.FullName
+            & $tdlExePath up -n $ns --gdrive --rm -p $file.FullName
             if ($LASTEXITCODE -eq 0) {
                 $uploadedCount++
                 $totalSizeUploadedBytes += $file.Length
