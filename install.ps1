@@ -160,7 +160,7 @@ if (-not $ChannelUrl) {
         if ([string]::IsNullOrWhiteSpace($ChannelUrl)) {
             Write-Host ""
             Write-Host "📋 Your accessible chats:" -ForegroundColor Cyan
-            & $tdlExePath chat ls -n $Namespace -s $storageOpt 2>&1 | Out-Host
+            & $tdlExePath chat ls -n $Namespace --storage $storageOpt 2>&1 | Out-Host
             Write-Host ""
             $ChannelUrl = Read-Host "Now enter a chat username or ID from the list above"
         }
@@ -172,7 +172,7 @@ Write-Host "✓ Target: $ChannelUrl" -ForegroundColor Green
 
 # Telegram login (first time)
 Write-Host "🔍 Checking Telegram session..." -ForegroundColor Gray
-& $tdlExePath chat ls -n $Namespace -s $storageOpt --limit 1 *>$null
+& $tdlExePath chat ls -n $Namespace --storage $storageOpt --limit 1 *>$null
 if ($LASTEXITCODE -ne 0) {
     Write-Host ""
     Write-Host "🔑 First time setup - Login to Telegram" -ForegroundColor Yellow
