@@ -84,6 +84,13 @@ cd tdl
 docker build -t tdl .
 ```
 
+## Development & Tests
+
+- Go 1.22+ is required (the Dockerfile now uses `golang:1.22-alpine`).
+- Fast checks: `go test ./... ./core/... ./extension/...` (integration suite is skipped by default).
+- Integration upload/download/chat tests are opt-in: start the Telegram test server expected at `127.0.0.1:10443` (see `test/testserver/`) and run `TDL_INTEGRATION=1 go test ./test -run TestCommand -timeout 5m`.
+- Manual end-to-end: `tdl login`, upload with `tdl upload -p <dir> --gdrive --rm`, and download a message link with `tdl download -u <t.me/...> -d <dir> --template "{{ .FileName }}"`.
+
 ## New Features
 
 ### 🆕 Google Drive Upload

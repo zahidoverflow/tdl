@@ -7,8 +7,10 @@ import (
 	"io"
 	"log"
 	"math/rand"
+	"net"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -25,6 +27,9 @@ func TestCommand(t *testing.T) {
 	RunSpecs(t, "Test tdl")
 }
 
+const integrationEnv = "TDL_INTEGRATION"
+const testServerAddr = "127.0.0.1:10443"
+
 var (
 	cmd         *cobra.Command
 	args        []string
@@ -34,7 +39,19 @@ var (
 )
 
 var _ = BeforeSuite(func(ctx context.Context) {
-	var err error
+	if os.Getenv(integrationEnv) == "" {
+		Skip(fmt.Sprintf("integration tests skipped (set %s=1 and start the Telegram test server at %s)", integrationEnv, testServerAddr))
+	}
+
+	dialCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+
+	conn, err := (&net.Dialer{}).DialContext(dialCtx, "tcp", testServerAddr)
+	if err != nil {
+		Skip(fmt.Sprintf("integration tests need Telegram test server at %s (%v)", testServerAddr, err))
+	}
+	_ = conn.Close()
+
 	testAccount, sessionFile, err = testserver.Setup(ctx, rand.NewSource(GinkgoRandomSeed()))
 	Expect(err).To(Succeed())
 
